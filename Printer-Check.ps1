@@ -11,28 +11,50 @@
       their default, and whether a specific queue is present. Changes
       nothing.
 
-      Works pasted into the ScreenConnect Commands tab, Backstage, or a
-      normal user PowerShell window.
+      IMPORTANT - the ScreenConnect Commands tab kills a command after
+      10 SECONDS. This script therefore never waits longer than ~4s. If
+      the probe has not finished by then it prints the exact one-liner
+      to read the result a few seconds later. Nothing is lost: the probe
+      writes its output to a file inside the user's session.
 
-      The three lines at the very top are ScreenConnect hashbang
-      modifiers: #!ps sends this to PowerShell, #timeout lifts the
-      10-second kill, #maxlength lifts the 10,000-character output cap.
+      The three lines at the top are ScreenConnect hashbang modifiers.
+      #!ps works; #timeout is ignored by some builds, which is why the
+      script is built to tolerate being killed.
+
+      Works pasted into the Commands tab, Backstage, or a user window.
     ================================================================
 #>
 
 # =========================== CONFIG ============================
 $PrinterPath = '\\IBNPS01\Reception Printer'   # <-- queue to look for ('' = just list)
 $User        = ''                               # blank = whoever is logged on
+$WaitSeconds = 4                                # how long to wait before deferring
 # ===============================================================
 
 # Optional overrides for the one-liner form:
 #   $env:PrinterCheckPath = '\\server\queue' ; $env:PrinterCheckUser = 'DOMAIN\name'
 if ($env:PrinterCheckPath) { $PrinterPath = $env:PrinterCheckPath }
 if ($env:PrinterCheckUser) { $User        = $env:PrinterCheckUser }
+if ($env:PrinterCheckWait) { $WaitSeconds = [int]$env:PrinterCheckWait }
+
+# Read mode: print the newest stored result and stop. Safe to run repeatedly.
+if ($env:PrinterCheckRead) {
+    $f = Get-ChildItem 'C:\Users\*\AppData\Local\Temp\PrinterCheck-*.txt' -ErrorAction SilentlyContinue |
+         Sort-Object LastWriteTime | Select-Object -Last 1
+    if ($f) {
+        Write-Host ('Result from {0:HH:mm:ss}:' -f $f.LastWriteTime)
+        Get-Content -LiteralPath $f.FullName
+        Write-Host ('(file: {0})' -f $f.FullName)
+    }
+    else { Write-Host 'No stored result yet - the probe may still be starting.' }
+    Get-ScheduledTask -TaskName 'PrinterCheck-*' -ErrorAction SilentlyContinue |
+        Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
+    return
+}
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.0.0'
+$scriptVersion = '1.1.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -138,6 +160,10 @@ catch {
 Say ('Probe:    {0}' -f $payloadFile)
 Say ('Queue:    {0}' -f $(if ($PrinterPath) { $PrinterPath } else { '(list only)' }))
 
+$deferred = $false
+$taskName = $null
+$payloadKept = $false
+
 try {
     $ident = [Security.Principal.WindowsIdentity]::GetCurrent()
 
@@ -177,9 +203,9 @@ try {
         }
         if (-not $profileDir) { $profileDir = 'C:\Users\' + ($User -split '\\')[-1] }
 
-        # A task's console output is not readable from here, so the probe writes a file
-        # in the user's own temp folder and we read that afterwards.
-        $outFile = '{0}\AppData\Local\Temp\PrinterCheck-{1}.txt' -f $profileDir, $stamp
+        # A task's console output cannot be read from here, so the probe writes a
+        # file in the user's own temp folder and we read that afterwards.
+        $outFile  = '{0}\AppData\Local\Temp\PrinterCheck-{1}.txt' -f $profileDir, $stamp
         $taskName = 'PrinterCheck-' + $stamp
         $argLine = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}" -OutFile "{2}"' -f `
                         $payloadFile, $PrinterPath, $outFile
@@ -195,38 +221,56 @@ try {
         $startedAt = Get-Date
         # LastRunTime is truncated to whole seconds by Windows, hence the slack.
         $notBefore = $startedAt.AddSeconds(-5)
-        $task = $null; $info = $null; $done = $false
-        $lastNote = Get-Date
+        $task = $null; $info = $null
         try {
             Start-ScheduledTask -TaskName $taskName
-            Say 'Reading...'
-            $deadline = (Get-Date).AddSeconds(120)
-            do {
-                Start-Sleep -Seconds 2
+            Say ('Reading (up to {0}s)...' -f $WaitSeconds)
+            $deadline = (Get-Date).AddSeconds($WaitSeconds)
+            while (-not (Test-Path -LiteralPath $outFile) -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 400
                 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
                 if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
-                $done = $task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore
-                if (-not $done -and ((Get-Date) - $lastNote).TotalSeconds -ge 30) {
-                    Say ('  still waiting - state: {0}' -f $task.State)
-                    $lastNote = Get-Date
+                # LastRunTime is truncated to whole seconds by Windows, hence the slack.
+                if ($task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore) {
+                    Start-Sleep -Milliseconds 300   # let the file flush
+                    break
                 }
-            } while (-not $done -and (Get-Date) -lt $deadline)
+            }
         }
-        finally {
-            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+        catch {
+            Say ('Task start failed: {0}' -f $_.Exception.Message)
         }
 
         Write-Host ''
         if (Test-Path -LiteralPath $outFile) {
             Get-Content -LiteralPath $outFile | ForEach-Object { Write-Host $_ }
-            Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
+            Say ('Result kept at {0}' -f $outFile)
         }
         else {
-            Say ('No output at {0} - the probe did not run as that user.' -f $outFile)
-            Say ('Task result: {0}' -f $(if ($info) { $info.LastTaskResult } else { 'n/a' }))
+            # Out of time (the Commands tab kills at 10s). Do NOT delete the probe
+            # or the task: the task may not have started yet.
+            $deferred = $true
+            $payloadKept = $true
+            Say 'Probe is still running - this console is about to be killed.'
+            Write-Host ''
+            Write-Host 'Run this in a few seconds to read the result:' -ForegroundColor Yellow
+            Write-Host ''
+            Write-Host "  `$f = Get-ChildItem 'C:\Users\*\AppData\Local\Temp\PrinterCheck-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1"
+            Write-Host "  if (`$f) { Get-Content `$f.FullName } else { 'still running' }"
+            Write-Host ''
+            Write-Host 'Or, one line:' -ForegroundColor Yellow
+            Write-Host "  `$env:PrinterCheckRead = 'true'; irm <this gist url> | iex"
+            Write-Host ''
+            Say ('Task: {0}  (cleanup: Unregister-ScheduledTask -TaskName ''{0}'' -Confirm:$false)' -f $taskName)
         }
     }
 }
 finally {
-    Remove-Item -LiteralPath $payloadFile -Force -ErrorAction SilentlyContinue
+    # Never remove the probe while a deferred task may still be about to use it.
+    if (-not $payloadKept) {
+        Remove-Item -LiteralPath $payloadFile -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $deferred -and $taskName) {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    }
 }
