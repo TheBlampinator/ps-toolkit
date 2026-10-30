@@ -11,6 +11,17 @@ or Toolbox, `PsExec -s`, most RMM agents.
 
 Full command reference: **[REFERENCE.md](REFERENCE.md)**
 
+> ### Blocked from running the script? Do this first
+>
+> ```powershell
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+> ```
+>
+> Same window as the script — it resets when the window closes, and it's the quickest
+> way past the execution-policy error. Or skip it entirely and use the `.cmd` launcher
+> (`Add-PrinterAsUser.cmd`), which applies the bypass for you. Details and caveats:
+> [REFERENCE.md §0](REFERENCE.md#0-running-it--no-set-executionpolicy-step-needed).
+
 ## The problem these solve
 
 A printer connection lives in `HKCU\Printers\Connections`. OneDrive's account
