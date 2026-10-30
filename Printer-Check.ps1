@@ -17,9 +17,13 @@
       to read the result a few seconds later. Nothing is lost: the probe
       writes its output to a file inside the user's session.
 
-      The three lines at the top are ScreenConnect hashbang modifiers.
-      #!ps works; #timeout is ignored by some builds, which is why the
-      script is built to tolerate being killed.
+      The lines at the top are ScreenConnect hashbang modifiers. They MUST
+      be contiguous on the first lines - a blank line between them and
+      only the first one is applied, which silently leaves the 10-second
+      kill in place. Confirmed on 26.7.6.9783: pasted as-is, #timeout
+      works and the script may wait; pasted with a blank line or without
+      the timeout line, the console dies at 10s, which is why the
+      fallback instructions are printed before the wait, not after.
 
       Works pasted into the Commands tab, Backstage, or a user window.
     ================================================================
@@ -28,7 +32,7 @@
 # =========================== CONFIG ============================
 $PrinterPath = '\\IBNPS01\Reception Printer'   # <-- queue to look for ('' = just list)
 $User        = ''                               # blank = whoever is logged on
-$WaitSeconds = 4                                # how long to wait before deferring
+$WaitSeconds = 25                               # needs #timeout when run in the Commands tab
 # ===============================================================
 
 # Optional overrides for the one-liner form:
@@ -54,7 +58,7 @@ if ($env:PrinterCheckRead) {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.1.0'
+$scriptVersion = '1.2.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -222,9 +226,14 @@ try {
         # LastRunTime is truncated to whole seconds by Windows, hence the slack.
         $notBefore = $startedAt.AddSeconds(-5)
         $task = $null; $info = $null
+        # Print the fallback BEFORE waiting. If the console is killed mid-wait the
+        # tail of the output is lost, so the instructions have to come first.
+        Say ('Waiting up to {0}s for the probe...' -f $WaitSeconds)
+        Write-Host '  If this console is killed before that, read the result with:' -ForegroundColor DarkGray
+        Write-Host "    `$f = Get-ChildItem 'C:\Users\*\AppData\Local\Temp\PrinterCheck-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1; if (`$f) { Get-Content `$f.FullName } else { 'still running' }" -ForegroundColor DarkGray
+        Write-Host ''
         try {
             Start-ScheduledTask -TaskName $taskName
-            Say ('Reading (up to {0}s)...' -f $WaitSeconds)
             $deadline = (Get-Date).AddSeconds($WaitSeconds)
             while (-not (Test-Path -LiteralPath $outFile) -and (Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 400
