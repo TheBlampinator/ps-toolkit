@@ -10,6 +10,7 @@ printer script for when nothing can be uploaded.
 | [`Add-PrinterAsUser.ps1`](Add-PrinterAsUser.ps1) | Adds / removes / verifies a network printer connection for the logged-on user |
 | [`Reset-OneDriveLink-2.ps1`](Reset-OneDriveLink-2.ps1) | Unlinks and re-links OneDrive for the logged-on user |
 | [`Printer-Setup-Paste.ps1`](Printer-Setup-Paste.ps1) | Same printer job, zero install: edit 4 lines at the top, paste the whole file into PowerShell |
+| [`Printer-Check.ps1`](Printer-Check.ps1) | Read-only: lists the logged-on user's printers, marks the default, and reports whether a specific queue is present |
 
 Full command reference: **[REFERENCE.md](REFERENCE.md)**
 

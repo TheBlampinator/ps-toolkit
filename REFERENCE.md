@@ -180,6 +180,53 @@ No parameters, no switches. The four config variables are the whole interface.
 
 ---
 
+## 1c. Printer-Check.ps1 — read-only, paste and go
+
+Lists what the logged-on user actually has. Changes nothing, registers no work task.
+
+```powershell
+$PrinterPath = '\\IBNPS01\Reception Printer'   # queue to look for ('' = just list)
+$User        = ''                               # blank = whoever is logged on
+```
+
+Output:
+
+```
+Identity : IBN\gnorfor
+Machine  : IBN00328-PERTH
+
+Printers visible to this user (4):
+  [DEFAULT] \\IBNPS01\Reception Printer
+            driver: HP LaserJet 4525 PCL6 | port: \\IBNPS01\HP4525_FIN
+  [       ] Microsoft Print to PDF
+            ...
+
+Per-user connections in HKCU (2):
+  \\IBNPS01\Reception Printer
+  \\IBNPS01\Second Floor
+
+Note: built-in, not real printers:
+  Microsoft Print to PDF
+
+Checking : \\IBNPS01\Reception Printer
+  in user printer list : True
+  HKCU connection key  : True
+  key path             : HKCU:\Printers\Connections\,,IBNPS01,Reception Printer
+  is default           : True
+  driver / port        : HP LaserJet 4525 PCL6 / \\IBNPS01\HP4525_FIN
+VERDICT: PRESENT
+```
+
+`VERDICT:` is one of `PRESENT`, `ABSENT`, or `PARTIAL` — the last means it is listed but
+has no HKCU connection key (or the reverse), which is the state that produces "it's
+there but won't print". Remove and re-add in that case.
+
+Bridging note: when run from a SYSTEM shell the probe's console output cannot be read
+back, so it writes to `%TEMP%\PrinterCheck-<stamp>.txt` in the user's profile and the
+outer script reads that file, prints it, then deletes it.
+
+---
+
 ## 2. Reset-OneDriveLink-2.ps1
 
 Unlinks and re-links OneDrive for the logged-on user. Local files are never deleted.
