@@ -103,7 +103,24 @@ function AskQueue {
             Line '  Nothing entered - that printer address is required here.' -ForegroundColor Yellow
             continue
         }
-        if ($v -match '^\\\\[^\\]+\\[^\\]+$') { return $v }
+        if ($v -match '^\\\\[^\\]+\\[^\\]+$') {
+            # Catch a typo in the server name now, not after a 25-second wait.
+            $server = ($v.TrimStart('\\') -split '\\')[0]
+            $ok = $null
+            try { $ok = [System.Net.Dns]::GetHostAddresses($server)[0].IPAddressToString } catch { $ok = $null }
+            if ($ok) {
+                Line "  server $server = $ok" -ForegroundColor DarkGray
+                return $v
+            }
+            Line ''
+            Line "  '$server' does not resolve to anything on this network." -ForegroundColor Red
+            Line '  That is usually a typo in the server name - check it against a printer' -ForegroundColor Yellow
+            Line '  they already have, or ask IT for the exact address.' -ForegroundColor Yellow
+            $anyway = AskYN -Prompt "  Use '$v' anyway?" -Default $false
+            if ($null -eq $anyway) { return $null }
+            if ($anyway) { return $v }
+            continue
+        }
         Line "  '$v' is not in the right form." -ForegroundColor Yellow
         Line '  Use two backslashes, then the server, then one backslash, then the queue.' -ForegroundColor DarkGray
     }
