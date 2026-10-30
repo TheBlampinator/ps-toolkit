@@ -34,7 +34,7 @@
 $SetDefault  = $true                            # set it as the user's default
 $Elevated    = $false                           # $true only if the driver won't install
 $User        = ''                               # blank = whoever is logged on
-$WaitSeconds = 25                               # needs #timeout in the Commands tab
+$WaitSeconds = 180                              # a failing printui call takes ~150s
 
 if ($env:PrinterSetupElevated -eq 'true')  { $Elevated    = $true }
 if ($env:PrinterSetupDefault -eq 'false')  { $SetDefault  = $false }
@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.5.0'
+$scriptVersion = '1.6.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -324,11 +324,16 @@ try {
         # the log tells us whether it actually succeeded.
         Say ('Waiting up to {0}s for the result...' -f $WaitSeconds)
         $deadline = (Get-Date).AddSeconds($WaitSeconds)
+        # Only a log written by THIS run counts. Without this filter the newest log is
+        # whatever a previous attempt left behind, and its verdict is reported as if it
+        # were this run's - a stale FAILED looks exactly like a fresh one.
+        $runStart = (Get-Date).AddSeconds(-3)
         $raw = $null
         $logFile = $null
         do {
             Start-Sleep -Seconds 1
             $logFile = Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' -ErrorAction SilentlyContinue |
+                           Where-Object { $_.LastWriteTime -ge $runStart } |
                            Sort-Object LastWriteTime | Select-Object -Last 1
             if ($logFile) { $raw = Get-Content -LiteralPath $logFile.FullName -Raw -ErrorAction SilentlyContinue }
         } while ((-not $raw -or $raw -notmatch 'CONNECTED OK|FAILED:') -and (Get-Date) -lt $deadline)
