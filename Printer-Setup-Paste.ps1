@@ -43,8 +43,13 @@ $User        = ''                               # blank = whoever is logged on
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$scriptVersion = '1.2.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
+
+# First output line, so a run is identifiable at a glance. If you do NOT see this line
+# in the Commands tab, whatever you pasted was not this script.
+Say ('Printer-Setup-Paste v{0} starting on {1}' -f $scriptVersion, $env:COMPUTERNAME)
 
 # The work that has to happen inside the user's session. Kept as literal text so it
 # can be dropped to a file and run under the user's token (or run right here).
