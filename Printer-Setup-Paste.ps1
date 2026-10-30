@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '2.0.0'
+$scriptVersion = '2.1.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -165,6 +165,27 @@ try {
 
     $existing = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterPath })
     Write-Log ('Before - visible to user: {0}' -f [bool]$existing)
+
+    # Predict the driver-consent prompt instead of discovering it 36 seconds later.
+    # If the queue needs a driver this machine does not have, Windows asks permission to
+    # install it - and that ask is what fails when nobody is there to click Install.
+    try {
+        $srvLeaf = $PrinterPath.TrimStart('\').Split('\')
+        $remote  = Get-Printer -ComputerName $srvLeaf[0] -Name $srvLeaf[1] -ErrorAction Stop
+        $localDrivers = @(Get-PrinterDriver -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
+        $haveIt = $localDrivers -contains $remote.DriverName
+        Write-Log ('Driver needed:    {0}' -f $remote.DriverName)
+        Write-Log ('Driver installed: {0}' -f $haveIt)
+        if (-not $haveIt) {
+            Write-Log 'This machine does not have that driver yet, so Windows will ask to install it.'
+            Write-Log 'If nobody clicks Install, this fails with 0x800704C7 (cancelled by the user).'
+            Write-Log 'Fix once per machine: run with Elevated on and someone at the PC to click Install,'
+            Write-Log 'or pre-install the driver / trust the print server via the PointAndPrint policy.'
+        }
+    }
+    catch {
+        Write-Log ('Could not compare drivers: {0}' -f $_.Exception.Message)
+    }
 
     if (-not $existing) {
         $added = $false
