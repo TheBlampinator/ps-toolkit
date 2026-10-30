@@ -8,6 +8,7 @@ or Toolbox, `PsExec -s`, most RMM agents.
 |---|---|
 | [`Add-PrinterAsUser.ps1`](Add-PrinterAsUser.ps1) | Adds / removes / verifies a network printer connection for the logged-on user |
 | [`Reset-OneDriveLink-2.ps1`](Reset-OneDriveLink-2.ps1) | Unlinks and re-links OneDrive for the logged-on user |
+| [`Printer-Setup-Paste.ps1`](Printer-Setup-Paste.ps1) | Same printer job, zero install: edit 4 lines at the top, paste the whole file into PowerShell |
 
 Full command reference: **[REFERENCE.md](REFERENCE.md)**
 

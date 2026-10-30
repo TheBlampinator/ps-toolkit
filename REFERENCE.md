@@ -104,6 +104,38 @@ SYSTEM shell would otherwise create it for the SYSTEM profile and nobody would s
 
 ---
 
+## 1b. Printer-Setup-Paste.ps1 — no upload, just paste
+
+For when you can't or don't want to get a file onto the box. Paste the entire file into
+a PowerShell window (Backstage or the user's own) and press Enter. **Pasting into an
+interactive session is not subject to the execution policy**, so there's nothing to
+unblock first.
+
+Edit only the config block at the top:
+
+```powershell
+$PrinterPath = '\\IBNPS01\Reception printer'   # \\server\printer
+$SetDefault  = $true                            # make it the user's default
+$Elevated    = $false                           # $true only if the driver won't install
+$User        = ''                               # blank = whoever is logged on
+```
+
+Then paste everything below it. What it does:
+
+1. Validates the path (`\\server\printer`), then writes a small payload script to
+   `C:\ProgramData\PrinterToolkit\PrinterSetup-<stamp>.ps1`.
+2. **Already the right user?** Runs the payload in place.
+   **In a SYSTEM shell?** Registers a one-shot task as the logged-on user, runs the
+   payload there, waits (180 s, heartbeat every 30 s), prints the user-session log.
+3. Reads the connection back from `HKCU:\Printers\Connections` and the user's
+   `Win32_Printer` list, then prints a green/red `RESULT:` line.
+4. Deletes the payload script and the task — unless it timed out, in which case the
+   payload is kept and its path printed.
+
+No parameters, no switches. The four config variables are the whole interface.
+
+---
+
 ## 2. Reset-OneDriveLink-2.ps1
 
 Unlinks and re-links OneDrive for the logged-on user. Local files are never deleted.
