@@ -3,7 +3,8 @@
 Two self-bridging PowerShell scripts that fix **per-user** state on Windows when your
 only shell is `NT AUTHORITY\SYSTEM` — ScreenConnect Backstage, the ConnectWise Control
 Commands tab or Toolbox, `PsExec -s`, most RMM agents. Plus a paste-only variant of the
-printer script for when nothing can be uploaded.
+printer script for when nothing can be uploaded, and a read-only checker that reports
+what the logged-on user actually has.
 
 | Script | Does |
 |---|---|

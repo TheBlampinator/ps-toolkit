@@ -1,8 +1,8 @@
 # PS Toolkit — command reference
 
-Two self-bridging scripts, plus a paste-only variant of the printer one. Run any of
-them from a SYSTEM shell (ScreenConnect Backstage, Commands tab, PsExec -s) or directly
-as the user; they detect which and adapt.
+Two self-bridging scripts, plus a paste-only variant of the printer one and a read-only
+printer check. Run any of them from a SYSTEM shell (ScreenConnect Backstage, Commands
+tab, PsExec -s) or directly as the user; they detect which and adapt.
 
 On the endpoint they end up under `C:\ProgramData\PrinterToolkit` (printer) and
 `C:\ProgramData\OneDriveRelink` (OneDrive) after the first SYSTEM run — those are the
