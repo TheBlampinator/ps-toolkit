@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '2.3.0'
+$scriptVersion = '2.5.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -189,6 +189,7 @@ try {
 
     if (-not $existing) {
         $added = $false
+        Write-Log 'Route 1: Add-PrinterConnection'
         if (Get-Command Add-PrinterConnection -ErrorAction SilentlyContinue) {
             try {
                 Add-PrinterConnection -ConnectionName $PrinterPath -ErrorAction Stop
@@ -212,6 +213,7 @@ try {
         # builds; the [wmiclass] accelerator can, and that is what Windows PowerShell 5.1
         # offers. Both are tried, then printui as the last resort.
         if (-not $added) {
+            Write-Log 'Route 2: wmiclass Win32_Printer'
             try {
                 $wmiSw = [System.Diagnostics.Stopwatch]::StartNew()
                 $wc = [wmiclass]'Win32_Printer'
@@ -247,6 +249,7 @@ try {
         # Add-PrinterConnection has been removed (Windows 11 24H2+ dropped it while
         # keeping the rest of the PrintManagement module).
         if (-not $added) {
+            Write-Log 'Route 3: Add-Printer -ConnectionName'
             if (Get-Command Add-Printer -ErrorAction SilentlyContinue) {
                 try {
                     $apSw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -266,6 +269,7 @@ try {
         # and exists on every Windows back to XP. This machine has neither the cmdlet nor
         # the Win32_Printer static method, so it is the most likely remaining path.
         if (-not $added) {
+            Write-Log 'Route 4: WScript.Network COM'
             $net = $null
             try {
                 $comSw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -284,6 +288,7 @@ try {
         }
 
         if (-not $added) {
+            Write-Log 'Route 5: printui.dll'
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
             $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
                     -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
@@ -436,6 +441,44 @@ if ($DriverSource -and (Test-Path -LiteralPath $DriverSource)) {
     }
 }
 
+# Pull the driver straight out of the print server's print$ share and install it
+# with pnputil. This is what Point-and-Print would do, minus the consent dialog:
+# no prompt, no policy change, no vendor download.
+function Install-DriverFromPrintShare {
+    param([string]$Server, [string]$DriverName)
+
+    $share = "\\$Server\print`$\x64"
+    if (-not (Test-Path -LiteralPath $share)) {
+        Write-Host ('  print$ share not readable on {0} ({1})' -f $Server, $share) -ForegroundColor DarkGray
+        return $false
+    }
+
+    $stage = 'C:\ProgramData\PrinterToolkit\drivers\from-server'
+    try { $null = New-Item -ItemType Directory -Path $stage -Force } catch { return $false }
+
+    Write-Host ('  Copying the driver from {0} ...' -f $share) -ForegroundColor DarkGray
+    try {
+        Copy-Item -Path (Join-Path $share '*') -Destination $stage -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-Host ('  Copy failed: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+    }
+
+    $infs = @(Get-ChildItem -LiteralPath $stage -Filter '*.inf' -Recurse -ErrorAction SilentlyContinue)
+    if (-not $infs.Count) {
+        Write-Host '  No .inf found in the print$ copy.' -ForegroundColor Yellow
+        return $false
+    }
+
+    foreach ($inf in $infs) {
+        Write-Host ('  pnputil /add-driver {0}' -f $inf.Name) -ForegroundColor DarkGray
+        try { & pnputil.exe /add-driver $inf.FullName /install | Out-Null } catch { }
+        $now = @(Get-PrinterDriver -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $DriverName }).Count -gt 0
+        if ($now) { return $true }
+    }
+    return $false
+}
+
 # =====================================================================
 #  AUTOMATIC DRIVER DELIVERY.
 #
@@ -481,10 +524,22 @@ if ($queueDriver) {
         }
         catch { $isAdminish = $false }
 
-        if (-not $isAdminish) {
+        # Attempt 1: install it ourselves from the print server's print$ share.
+        $gotIt = $false
+        if ($isAdminish) {
+            $qp2 = $PrinterPath.TrimStart('\\').Split('\\')
+            $gotIt = Install-DriverFromPrintShare -Server $qp2[0] -DriverName $queueDriver
+            if ($gotIt) {
+                Write-Host ('  Driver installed from the print server: {0}' -f $queueDriver) -ForegroundColor Green
+            }
+        }
+
+        # Attempt 2 (only if that failed): let Windows do it, with the consent gate
+        # opened for the length of this run.
+        if (-not $gotIt -and -not $isAdminish) {
             Write-Host '  Driver missing and this shell is not elevated - it can only be installed by the user, which is not possible unattended.' -ForegroundColor Yellow
         }
-        else {
+        elseif (-not $gotIt) {
             try {
                 if (Test-Path -LiteralPath $script:PolicyPath) {
                     $cur = Get-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -ErrorAction SilentlyContinue
