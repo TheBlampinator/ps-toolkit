@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.8.0'
+$scriptVersion = '1.9.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -219,6 +219,28 @@ try {
             }
             catch {
                 Write-Log ('CIM route failed: {0}' -f $_.Exception.Message)
+            }
+        }
+
+        # Third route: WScript.Network COM. No WMI and no PrintManagement module - it
+        # calls the same Win32 print API the Add Printer wizard uses, throws on failure,
+        # and exists on every Windows back to XP. This machine has neither the cmdlet nor
+        # the Win32_Printer static method, so it is the most likely remaining path.
+        if (-not $added) {
+            $net = $null
+            try {
+                $comSw = [System.Diagnostics.Stopwatch]::StartNew()
+                $net = New-Object -ComObject WScript.Network
+                $net.AddWindowsPrinterConnection($PrinterPath)
+                $comSw.Stop()
+                Write-Log ('WScript.Network.AddWindowsPrinterConnection completed after {0:N1}s' -f $comSw.Elapsed.TotalSeconds)
+                $added = $true
+            }
+            catch {
+                Write-Log ('COM route failed: {0}' -f $_.Exception.Message)
+            }
+            finally {
+                if ($net) { try { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($net) } catch { } }
             }
         }
 
