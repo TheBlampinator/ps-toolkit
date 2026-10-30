@@ -35,15 +35,25 @@
 #>
 
 # =========================== CONFIG ============================
-$PrinterPath = '\\IBNPS01\Reception printer'   # <-- CHANGE THIS: \\server\printer
+$PrinterPath = '\\IBNPS01\Reception Printer'   # <-- CHANGE THIS: \\server\printer
 $SetDefault  = $true                            # make it the user's default printer
 $Elevated    = $false                           # $true only if the driver won't install
 $User        = ''                               # blank = whoever is logged on
 # ===============================================================
 
+# Optional overrides, so the one-liner form can be reused without editing anything:
+#   $env:PrinterSetupPath     = '\\server\queue'
+#   $env:PrinterSetupElevated = 'true'
+#   $env:PrinterSetupDefault  = 'false'
+#   $env:PrinterSetupUser     = 'DOMAIN\name'
+if ($env:PrinterSetupPath)               { $PrinterPath = $env:PrinterSetupPath }
+if ($env:PrinterSetupElevated -eq 'true') { $Elevated   = $true }
+if ($env:PrinterSetupDefault -eq 'false') { $SetDefault = $false }
+if ($env:PrinterSetupUser)               { $User       = $env:PrinterSetupUser }
+
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.2.0'
+$scriptVersion = '1.3.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
