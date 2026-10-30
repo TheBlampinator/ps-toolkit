@@ -8,6 +8,21 @@ On the endpoint they end up under `C:\ProgramData\PrinterToolkit` (printer) and
 `C:\ProgramData\OneDriveRelink` (OneDrive) after the first SYSTEM run — those are the
 staged copies the scheduled task executes, not something you place there by hand.
 
+## Start here
+
+| I want to… | Read |
+|---|---|
+| Add a printer for the person who is logged in | [§1b](#1b-printer-setup-pasteps1--no-upload-just-paste) paste-and-go, or [§1](#1-add-printerasuserps1) from a saved file |
+| Know whether a printer is already there / what they have | [§1c](#1c-printer-checkps1--read-only-paste-and-go) |
+| Fix OneDrive that will not sign in or sync | [§2](#2-reset-onedrivelink-2ps1) |
+| My command died at 10 seconds / showed nothing | [§0a](#0a-screenconnect-commands-tab-the-10-second-kill) |
+| "Running scripts is disabled on this system" | [§0](#0-running-it--getting-past-the-execution-policy) |
+| A paste script refused to run and printed a red box | [§0b](#0b-required-environment-variables-paste-ready-scripts) |
+| Something is left behind on the PC | [§3](#3-useful-checks-from-a-system-shell) |
+| A script said success but the printer is not there | [§4](#4-gotchas) |
+
+Plain-English walkthroughs with no jargon: **[README.md](README.md)**.
+
 ---
 
 ## 0a. ScreenConnect Commands tab: the 10-second kill
@@ -54,6 +69,44 @@ Get-ChildItem 'C:\ProgramData\PrinterToolkit' -Filter 'PrinterSetup-*.ps1' |
 
 ---
 
+## 0b. Required environment variables (paste-ready scripts)
+
+`Printer-Setup-Paste.ps1` and `Printer-Check.ps1` have **no printer name in them at all**.
+They stop on the first line and print a red box telling you what to type, rather than
+guessing or doing the wrong thing. Two reasons it is built this way: the same file works
+at any site, and a forgotten value fails loudly instead of silently printing nothing.
+
+Set the value in the same window, on its own line, **before** the command:
+
+```powershell
+$env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
+```
+
+| Variable | Script | Meaning |
+|---|---|---|
+| `PrinterSetupPath` | setup | **required**; `\\server\queue` |
+| `PrinterSetupDefault` | setup | `'false'` leaves their default printer alone |
+| `PrinterSetupElevated` | setup | `'true'` only when the driver will not install |
+| `PrinterSetupUser` | setup | `'DOMAIN\name'` to choose the user yourself |
+| `PrinterSetupRead` | setup | `'true'` prints the last result and stops |
+| `PrinterCheckPath` | check | **required**; `\\server\queue`, or `list` |
+| `PrinterCheckUser` | check | `'DOMAIN\name'` to choose the user yourself |
+| `PrinterCheckRead` | check | `'true'` prints the last result and stops |
+
+The value disappears when that window closes — it is not saved anywhere on the PC.
+
+In the ScreenConnect Commands tab the modifiers must be **contiguous on the first lines**.
+A blank line between them and only `#!ps` is applied, which leaves the 10-second kill
+running:
+
+```
+#!ps
+#timeout=600000
+$env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
+irm <gist url> | iex
+```
+
+---
 ## 0. Running it — getting past the execution policy
 
 A `.ps1` **cannot** exempt itself: PowerShell checks the execution policy before it
@@ -155,39 +208,61 @@ a PowerShell window (Backstage or the user's own) and press Enter. **Pasting int
 interactive session is not subject to the execution policy**, so there's nothing to
 unblock first.
 
-Edit only the config block at the top:
+There is **no printer name anywhere in the file**. It stops with a red box until you say
+which printer, using an environment variable set in the same window before you paste:
 
 ```powershell
-$PrinterPath = '\\PRINTSERVER\QUEUE-NAME'   # \\server\printer
-$SetDefault  = $true                            # make it the user's default
-$Elevated    = $false                           # $true only if the driver won't install
-$User        = ''                               # blank = whoever is logged on
+$env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'   # required
 ```
 
-Then paste everything below it. What it does:
+| Variable | Meaning |
+|---|---|
+| `PrinterSetupPath` | **required** — `\\server\queue` |
+| `PrinterSetupDefault` | `'false'` leaves their current default printer alone |
+| `PrinterSetupElevated` | `'true'` only when the driver will not install |
+| `PrinterSetupUser` | `'DOMAIN\name'` to choose the user when several are logged on |
+| `PrinterSetupRead` | `'true'` prints the last result and stops; needs no queue |
+| `PrinterSetupWait` | seconds to wait for the result, default 25 |
 
-1. Validates the path (`\\server\printer`), then writes a small payload script to
+What it does:
+
+1. Refuses to continue if the queue is missing or malformed, printing the exact line to
+   type. Nothing is changed in that case.
+2. Validates `\\server\queue`, then writes a small payload script to
    `C:\ProgramData\PrinterToolkit\PrinterSetup-<stamp>.ps1`.
-2. **Already the right user?** Runs the payload in place.
-   **In a SYSTEM shell?** Registers a one-shot task as the logged-on user, runs the
-   payload there, waits (180 s, heartbeat every 30 s), prints the user-session log.
-3. Reads the connection back from `HKCU:\Printers\Connections` and the user's
+3. **Already the right user?** Runs the payload in place.
+   **In a SYSTEM shell?** Registers a one-shot task owned by the logged-on user, runs the
+   payload there, and waits up to 25 s for it.
+4. Reads the connection back from `HKCU:\Printers\Connections` and the user's
    `Win32_Printer` list, then prints a green/red `RESULT:` line.
-4. Deletes the payload script and the task — unless it timed out, in which case the
-   payload is kept and its path printed.
+5. Deletes the payload script and the task — unless it deferred to a later read, in which
+   case both are kept and their paths printed.
 
-No parameters, no switches. The four config variables are the whole interface.
+Run it from the Commands tab with the `#timeout` modifiers on the first lines (§0a): the
+default 10-second kill is shorter than a first-time driver install.
 
 ---
 
 ## 1c. Printer-Check.ps1 — read-only, paste and go
 
-Lists what the logged-on user actually has. Changes nothing, registers no work task.
+Lists what the logged-on user actually has. Changes nothing; the only thing it creates is
+a short-lived read task, which it removes.
+
+No printer name is built in. Supply the queue you are checking:
 
 ```powershell
-$PrinterPath = '\\PRINTSERVER\QUEUE-NAME'   # queue to look for ('' = just list)
-$User        = ''                               # blank = whoever is logged on
+$env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
 ```
+
+…or the word `list` to show everything without checking one printer:
+
+```powershell
+$env:PrinterCheckPath = 'list'
+```
+
+Without it the script stops and prints what to type — it will not guess. `''` cannot be
+used to mean "no queue", because assigning an empty string to an environment variable
+*deletes* it in PowerShell.
 
 Output:
 
@@ -304,42 +379,3 @@ Get-Printer | Format-Table Name, DriverName, PortName, Type
 - **Don't close the tab mid-run.** The task keeps running but the cleanup is skipped; unregister it by name.
 - **`-User` matters on RDP-heavy boxes.** Auto-detect refuses to guess when several users have a session.
 - **Registry backups (OneDrive)** land in `%LOCALAPPDATA%\OneDriveRelink\*.reg`; revert with `reg import <file>`.
-
-## 0b. Required environment variables (paste-ready scripts)
-
-`Printer-Setup-Paste.ps1` and `Printer-Check.ps1` contain **no printer name at all**.
-They refuse to run until an environment variable supplies one, and print a boxed
-`STOPPED - NOTHING WAS CHANGED` message telling you exactly what to type. This is
-deliberate: the same script works at any site, nothing needs editing, and a missing
-value fails loudly instead of adding the wrong printer.
-
-Set it on its own line **before** the command, in the same console:
-
-```powershell
-$env:PrinterSetupPath = '\\PRINT-SERVER\QUEUE-NAME'
-```
-
-| Variable | Script | Meaning |
-|---|---|---|
-| `PrinterSetupPath` | setup | **required**; `\\server\queue` |
-| `PrinterSetupDefault` | setup | `'false'` to not set it as default |
-| `PrinterSetupElevated` | setup | `'true'` only if the driver won't install |
-| `PrinterSetupUser` | setup | `DOMAIN\name` to pick the user yourself |
-| `PrinterSetupRead` | setup | `'true'`: print the last result and stop |
-| `PrinterCheckPath` | check | **required**; `\\server\queue`, or `list` |
-| `PrinterCheckUser` | check | `DOMAIN\name` to pick the user yourself |
-| `PrinterCheckRead` | check | `'true'`: print the last result and stop |
-
-`list` is the supported way to say "no specific queue" — assigning `''` or `$null`
-to an env var *deletes* it in PowerShell, so it cannot express that.
-
-In the ScreenConnect Commands tab, the hashbang modifiers must be **contiguous on the
-first lines** — a blank line between them and only `#!ps` is applied, leaving the
-10-second kill in place:
-
-```
-#!ps
-#timeout=600000
-$env:PrinterCheckPath = '\\PRINT-SERVER\QUEUE-NAME'
-irm <gist url> | iex
-```

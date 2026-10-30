@@ -1,172 +1,226 @@
 # ps-toolkit
 
-Two self-bridging PowerShell scripts that fix **per-user** state on Windows when your
-only shell is `NT AUTHORITY\SYSTEM` — ScreenConnect Backstage, the ConnectWise Control
-Commands tab or Toolbox, `PsExec -s`, most RMM agents. Plus a paste-only variant of the
-printer script for when nothing can be uploaded, and a read-only checker that reports
-what the logged-on user actually has.
+Small scripts for helping someone who is already logged in to their own PC — adding a
+printer to their account, or fixing OneDrive for them — **without** asking them to stop
+working while you take over their screen.
 
-| Script | Does |
-|---|---|
-| [`Add-PrinterAsUser.ps1`](Add-PrinterAsUser.ps1) | Adds / removes / verifies a network printer connection for the logged-on user |
-| [`Reset-OneDriveLink-2.ps1`](Reset-OneDriveLink-2.ps1) | Unlinks and re-links OneDrive for the logged-on user |
-| [`Printer-Setup-Paste.ps1`](Printer-Setup-Paste.ps1) | Same printer job, zero install: edit 4 lines at the top, paste the whole file into PowerShell |
-| [`Printer-Check.ps1`](Printer-Check.ps1) | Read-only: lists the logged-on user's printers, marks the default, and reports whether a specific queue is present |
+You run one command from your remote-support tool. The script does the rest.
 
-Full command reference: **[REFERENCE.md](REFERENCE.md)**
+---
 
-> ### Blocked by the execution policy?
->
-> PowerShell checks the policy before it reads the file, so the bypass has to come from
-> whatever launches the script. Put it on the command line:
->
-> ```powershell
-> powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
->     -PrinterPath '\\PRINTSERVER\QUEUE-NAME'
-> ```
->
-> Or set it for the current window only (resets when the window closes):
->
-> ```powershell
-> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-> ```
->
-> Details and caveats: [REFERENCE.md §0](REFERENCE.md#0-running-it--getting-past-the-execution-policy).
+## Which one do I want?
 
-## The problem these solve
+| If you want to… | Use this | Page |
+|---|---|---|
+| Add a printer for the person who is logged in | `Printer-Setup-Paste.ps1` | [step-by-step](#add-a-printer-the-whole-procedure) |
+| Check which printers they have, and whether one is missing | `Printer-Check.ps1` | [step-by-step](#check-what-printers-they-have) |
+| Fix OneDrive that will not sync / sign in | `Reset-OneDriveLink-2.ps1` | [step-by-step](#fix-onedrive) |
+| Do any of the above from a saved file, with options | `Add-PrinterAsUser.ps1` | [REFERENCE.md](REFERENCE.md) |
 
-A printer connection lives in `HKCU\Printers\Connections`. OneDrive's account
-registration lives in `HKCU\Software\Microsoft\OneDrive\Accounts`. Both are per-user.
+The printer scripts and the checker are also runnable by **copying and pasting** — no
+file to upload, nothing to install.
 
-Run `Add-PrinterConnection` from a SYSTEM shell and it succeeds — into the SYSTEM
-profile. The user sees nothing, and you've marked the ticket resolved. That's the
-silent failure these scripts exist to prevent.
+---
 
-## How they work
+## Before you start
 
-Each script is a single file that picks its own mode:
+You need two things:
 
-- **Run as the logged-on user** (manual run, Intune "logged on credentials", GPO logon
-  script) → it just does the work.
-- **Run as SYSTEM** → it stages a copy of itself in `C:\ProgramData\<Tool>\`, registers
-  a one-shot scheduled task owned by the interactive user with
-  `-LogonType Interactive`, re-invokes itself there with `-Payload`, waits, prints the
-  user-session log, and removes the task.
+1. **The printer's address**, which looks like `\\SERVER\QUEUE`.
+   For example `\\print01\Reception printer`. If you do not know it, someone in IT can
+   give it to you, or you can list them (see [Check what printers they have](#check-what-printers-they-have)).
+2. **The person logged in to the PC** — the script works on whoever is logged on, so do
+   not run it while nobody is signed in.
 
-No desktop session, no screen share, no interruption. The scheduled task is the
-bridge; SYSTEM is only the launcher.
+---
 
-## Quick start
+## Add a printer: the whole procedure
 
-PowerShell checks the execution policy before it reads a script, so a `.ps1` can't
-exempt itself — the bypass has to come from the command line:
+**Step 1.** Open your remote-support tool (ScreenConnect / ConnectWise Control) and go
+to the **Commands** tab.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
-    -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
-    -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify
-
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Reset-OneDriveLink-2.ps1 -Account All
-```
-
-Already in a PowerShell window you control? Unblock the window once, then call the
-scripts directly:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
-```
-
-No file on the box at all? Paste `Printer-Setup-Paste.ps1` into an interactive
-session — typing into the console isn't subject to the execution policy.
-
-Both scripts refuse to run rather than degrading to SYSTEM: the payload throws if it finds
-itself as SYSTEM, and `-Verify` checks the *user's* hive, not SYSTEM's.
-
-## One-liners (public gists)
-
-Every script is also published as a **public gist**, so you can run one without getting a
-file onto the box. These are the stable `/raw/<file>` URLs — they always serve the latest
-published version. For an immutable URL (pinned to a revision that can never change),
-run `scripts/publish-gists.sh`; it prints the pinned form and records ids in
-`scripts/gists.json`.
-
-**Paste-ready** — runs in memory, nothing lands on disk:
-
-| Script | Paste |
-|---|---|
-| `Printer-Setup-Paste.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 \| iex` |
-| `Printer-Check.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 \| iex` |
-
-Both are built to survive the ScreenConnect Commands tab killing them at 10 seconds: they
-wait ~4 seconds, then either print the verdict or tell you how to read it. Put `#!ps` on
-the first line (already in the files) so the tab sends it to PowerShell rather than cmd.
-`#timeout` is honoured by some builds and ignored by others, so neither script depends on it.
-
-Collect a deferred result without running anything again:
+**Step 2.** Copy these four lines. Change only the part inside the quotes on line 3 —
+put your printer's address there.
 
 ```
 #!ps
-$env:PrinterSetupRead = 'true'; irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
-$env:PrinterCheckRead = 'true'; irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
+#timeout=600000
+$env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84c0d270f46e00119d2f60fb3348177a967423e9/Printer-Setup-Paste.ps1 | iex
 ```
 
-**File-based** — `Add-PrinterAsUser.ps1` and `Reset-OneDriveLink-2.ps1` re-invoke
-themselves through a scheduled task, so they need a real file path. Two statements:
+**Step 3.** Paste all four lines into the Commands box and run it.
 
-```powershell
-$f = "$env:TEMP\Add-PrinterAsUser.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/42000b8cddae47063f738a8a214ca883/raw/Add-PrinterAsUser.ps1 -OutFile $f
-& $f -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
+**Step 4.** Read the result. It will say one of these:
+
+```
+[14:02:13] RESULT: CONNECTED - \\PRINTSERVER\QUEUE-NAME is on the printer list.
+           It is set as the default printer.
+```
+That is success. The printer is on the user's list; they may need to reopen the print
+dialog to see it.
+
+or
+
+```
+############################################################
+#  STOPPED - NO PRINTER WAS ADDED. NOTHING WAS CHANGED.    #
+############################################################
+```
+You forgot line 3, or spelled the address wrongly. The message tells you what to type.
+Nothing was changed, so it is safe to fix and run again.
+
+or
+
+```
+ERROR: ... Access is denied ...
+```
+The printer's software (the "driver") is not on this PC and Windows will not let a
+normal user install it. Re-run with this extra line second from the top:
+
+```
+$env:PrinterSetupElevated = 'true'
 ```
 
-```powershell
+### The four lines, explained
+
+| Line | What it does |
+|---|---|
+| `#!ps` | "Run this as PowerShell, not as old-style DOS commands." |
+| `#timeout=600000` | "Do not kill this after 10 seconds; give it 10 minutes." |
+| `$env:PrinterSetupPath = '...'` | Tells the script **which** printer. It has no printer name built in. |
+| `irm ... \| iex` | Downloads the script and runs it in memory. Nothing is saved to the PC. |
+
+> **These four lines must sit together with no blank line between them.** If there is a
+> blank line, ScreenConnect only reads the first special line and still kills the command
+> after 10 seconds. This is the single most common way this goes wrong.
+
+---
+
+## Check what printers they have
+
+Same idea, four lines, and this one only *looks* — it never changes anything.
+
+```
+#!ps
+#timeout=600000
+$env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/da21a3dc1828eaee7b49b7b5a8f29be69eaaee34/Printer-Check.ps1 | iex
+```
+
+Put the printer you are looking for on line 3, or the word `list` to see everything
+without checking one particular printer.
+
+You get a list like this:
+
+```
+Identity : CONTOSO\jsmith
+Printers visible to this user (4):
+  [DEFAULT] \\PRINTSERVER\QUEUE-NAME
+            driver: HP LaserJet 4525 PCL6 | port: \\PRINTSERVER\HP4525_FIN
+  [       ] Microsoft Print to PDF
+Per-user connections in HKCU (2):
+  \\PRINTSERVER\QUEUE-NAME
+
+Checking : \\PRINTSERVER\QUEUE-NAME
+  in user printer list : True
+  HKCU connection key  : True
+  is default           : True
+VERDICT: PRESENT
+```
+
+`VERDICT` is the answer:
+
+| Verdict | Means | Do this |
+|---|---|---|
+| `PRESENT` | All good. | Nothing. |
+| `ABSENT` | The printer is not there. | Add it (previous section). |
+| `PARTIAL` | Half-installed — it appears but will not print. | Remove and add again. |
+
+---
+
+## Fix OneDrive
+
+For a user whose OneDrive will not sync, keeps asking to sign in, or shows the wrong
+account. This un-links and re-links it. **Their files are not deleted.**
+
+```
+#!ps
+#timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
 irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
-The endpoint needs outbound HTTPS to `gist.githubusercontent.com`. On a box behind a
-strict egress proxy these will fail — save the script locally and run it instead.
+If the person uses only a work/school account you can leave `-Account All` off.
 
-`scripts/publish-gists.sh` (bash + `gh` + `jq`) creates or updates all four gists from the
-repo files and writes `scripts/gists.json` so repeat runs update instead of duplicating.
+OneDrive restarts by itself. If your organisation has not turned on "silently sign in",
+the user will see a OneDrive sign-in window — tell them it is coming, or run this while
+they are at lunch.
 
-## Exit 0 means verified
+---
 
-Neither script trusts the cmdlet's return. The payload reads the per-user store back
-(`HKCU:\Printers\Connections\,,server,queue`, or the OneDrive `Accounts` key) and
-throws if the state isn't there — so exit 0 from the bridge means the change actually
-landed for that user, and exit 1 always carries a reason in the log.
+## If something goes wrong
 
-## Requirements
+| What you see | What it means | What to do |
+|---|---|---|
+| `Killed after 10000 milliseconds` | ScreenConnect stopped the command after 10 seconds. | Check the four lines have no blank line between them. The work may still have happened — read the result (below). |
+| `STOPPED - ... NOTHING WAS CHANGED` | A setting was missing or the address was malformed. | Read the message, it shows the exact line to type. |
+| `Missing type name after '['` | You pasted *output* instead of the script. | The real script starts with `#!ps`. Clear the box and paste again. |
+| `Access is denied` | The printer's driver cannot be installed by a normal user. | Add the `$env:PrinterSetupElevated = 'true'` line. |
+| `More than one user is logged on` | Two people are signed in; the script will not guess. | Add `$env:PrinterSetupUser = 'DOMAIN\name'`. |
+| `Nobody is logged on` | There is no user session to fix. | Ask them to sign in first. |
+| `VERDICT: ABSENT` | The printer really is not there. | Add it. |
 
-- Windows PowerShell 5.1 or PowerShell 7.
-- A logged-on interactive user. Nothing here works unattended — a per-user fix needs a
-  session to fix.
-- `Get-Process -IncludeUserName` needs elevation, which a SYSTEM shell already has.
-- Printer driver: if it isn't on the machine and
-  `RestrictDriverInstallationToAdministrators=1` blocks install, use `-Elevated`.
+### Read the result without running anything again
 
-## Tests
+If a command was killed before it printed, the work usually still finished. This prints
+the last result — it changes nothing:
 
-`tests/` holds mock harnesses that execute the scripts' real function bodies against
-stubbed Windows cmdlets — they prove syntax, control flow and argument construction on
-any platform, including Linux with PowerShell 7. They cannot prove Task Scheduler,
-registry or spooler behaviour; that needs an endpoint.
-
-```powershell
-pwsh -NoProfile -File tests/test-printer.ps1   # 24 assertions
-pwsh -NoProfile -File tests/test-bridge.ps1    # 12 assertions (1 needs Windows)
+```
+#!ps
+$f = Get-ChildItem 'C:\Users\*\AppData\Local\Temp\PrinterCheck-*.txt' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+if ($f) { Get-Content $f.FullName } else { 'nothing yet - give it a few seconds' }
 ```
 
-## Caveats
+---
 
-- Auto-detect reads `explorer.exe` owners, so it sees every interactive session. It
-  **refuses to guess** when more than one is logged on — pass `-User 'DOMAIN\name'`.
-- Closing the Backstage tab mid-run leaves the scheduled task registered; the payload
-  still completes, but remove it with `Unregister-ScheduledTask`.
-- These scripts are not signed. Add your own code-signing step if your environment
-  requires it.
+## Words used on this page
+
+| Word | Plain meaning |
+|---|---|
+| **Queue** | The printer's own name on the server. The last part of `\\server\queue`. |
+| **Server** | The machine that shares the printer. The first part of `\\server\queue`. |
+| **Driver** | The small piece of software Windows needs before it can talk to a printer. |
+| **SYSTEM** | The invisible Windows account your remote tool runs as. Printers it adds go to SYSTEM, not to the person — which is the whole problem these scripts solve. |
+| **Environment variable** (`$env:...`) | A temporary named value in the window you are typing in. It disappears when that window closes. Used here so no printer name is written into the script. |
+| **HKCU** | The part of the Windows settings store that belongs to *one person*. Everything a user "has" — printers, OneDrive — is recorded there. |
+| `irm` / `iex` | `irm` downloads a web page; `iex` runs what it downloaded. Together: "run this script from the internet without saving it". |
+
+---
+
+## How it works (one paragraph)
+
+Printers and OneDrive settings belong to a person, not to the PC. Your remote tool runs
+as SYSTEM, so a printer added there would vanish into SYSTEM's own settings and the user
+would never see it. These scripts detect that situation and start a short-lived scheduled
+task **owned by the person who is logged in**, so the work happens in their account.
+Nothing appears on their screen and you never take over their desktop.
+
+---
+
+## For whoever maintains this
+
+- Full command reference and every option: **[REFERENCE.md](REFERENCE.md)**
+- Run by the logged-on user (Intune "logged on credentials", GPO logon script, or a
+  normal console) and the scripts skip the scheduling step and just do the work.
+- Exit code **0** means verified: the script reads the per-user store back
+  (`HKCU:\Printers\Connections\...` or the OneDrive `Accounts` key) and fails if the
+  change is not there. Exit **1** always carries a reason in the log.
+- Logs: `C:\Users\<user>\AppData\Local\PrinterToolkit\` and `...\OneDriveRelink\`.
+- Tests (mock harnesses, run anywhere including Linux + PowerShell 7):
+  `pwsh -File tests/test-printer.ps1` (26 assertions) and
+  `pwsh -File tests/test-bridge.ps1` (14 assertions, 1 requires Windows).
+- Not code-signed. Add your own signing step if your environment requires it.
+- Requires outbound HTTPS to `gist.githubusercontent.com` for the paste-one-liners; on a
+  box behind a strict egress proxy, save the file locally and run it instead.
