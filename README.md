@@ -42,7 +42,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/28dbff85cfa7da9849b311b7ddd4b24c08e934ad/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/e11f317419edcf5c6a1e4ca3ab5a01769c7e2640/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -143,7 +143,7 @@ Same idea, four lines, and this one only *looks* — it never changes anything.
 #!ps
 #timeout=600000
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/da21a3dc1828eaee7b49b7b5a8f29be69eaaee34/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/23ff3dbaedf1bb36af2b261d337164c937894fd1/Printer-Check.ps1 | iex
 ```
 
 Put the printer you are looking for on line 3, or the word `list` to see everything

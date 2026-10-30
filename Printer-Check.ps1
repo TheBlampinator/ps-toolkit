@@ -46,7 +46,7 @@ if ($env:PrinterCheckRead) {
          Sort-Object LastWriteTime | Select-Object -Last 1
     if ($f) {
         Write-Host ('Result from {0:HH:mm:ss}:' -f $f.LastWriteTime)
-        Get-Content -LiteralPath $f.FullName
+        Get-Content -LiteralPath $f.FullName | Where-Object { $_ -notmatch 'END-OF-REPORT' }
         Write-Host ('(file: {0})' -f $f.FullName)
     }
     else { Write-Host 'No stored result yet - the probe may still be starting.' }
@@ -108,7 +108,7 @@ elseif ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.3.0'
+$scriptVersion = '1.4.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -198,6 +198,8 @@ if ($PrinterPath) {
     elseif ($match -or $keyPresent)   { Write-Line 'VERDICT: PARTIAL - listed or keyed, but not both. Remove and re-add.' }
     else                              { Write-Line 'VERDICT: ABSENT' }
 }
+
+Write-Line 'END-OF-REPORT'
 '@
 
 # ---- write the probe somewhere every account can read ----------------------
@@ -285,8 +287,16 @@ try {
         try {
             Start-ScheduledTask -TaskName $taskName
             $deadline = (Get-Date).AddSeconds($WaitSeconds)
-            while (-not (Test-Path -LiteralPath $outFile) -and (Get-Date) -lt $deadline) {
+            # Wait for the END-OF-REPORT marker, not merely for the file to exist: the
+            # probe creates it on its first line, so testing existence alone reads a
+            # half-written report and prints a truncated printer list.
+            $raw = ''
+            while ($raw -notmatch 'END-OF-REPORT' -and (Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 400
+                if (Test-Path -LiteralPath $outFile) {
+                    $raw = Get-Content -LiteralPath $outFile -Raw -ErrorAction SilentlyContinue
+                    if (-not $raw) { $raw = '' }
+                }
                 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
                 if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
                 # LastRunTime is truncated to whole seconds by Windows, hence the slack.
@@ -302,7 +312,9 @@ try {
 
         Write-Host ''
         if (Test-Path -LiteralPath $outFile) {
-            Get-Content -LiteralPath $outFile | ForEach-Object { Write-Host $_ }
+            Get-Content -LiteralPath $outFile |
+                Where-Object { $_ -notmatch 'END-OF-REPORT' } |
+                ForEach-Object { Write-Host $_ }
             Say ('Result kept at {0}' -f $outFile)
         }
         else {
