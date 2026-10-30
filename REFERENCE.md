@@ -318,7 +318,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/c207e472992f47b15716b55998802ae2a4e12bdb/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/3e4aa9d05e4b98c5c5a6444163869d908daa3a71/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` exit. After each job it

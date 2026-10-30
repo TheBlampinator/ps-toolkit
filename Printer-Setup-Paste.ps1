@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '2.2.0'
+$scriptVersion = '2.3.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -436,6 +436,73 @@ if ($DriverSource -and (Test-Path -LiteralPath $DriverSource)) {
     }
 }
 
+# =====================================================================
+#  AUTOMATIC DRIVER DELIVERY.
+#
+#  Windows will not let a background process answer the "install this
+#  printer driver?" prompt, so a connection to a queue whose driver the
+#  machine lacks fails with 0x800704C7. There is no way to click it and no
+#  way around it - except to let the print server deliver the driver
+#  without asking, for the length of this one operation.
+#
+#  RestrictDriverInstallationToAdministrators is the switch that governs
+#  that. It is set to 0 here, the connection runs, and the previous value
+#  is put back in the finally block below. Nothing is left changed.
+#
+#  Skipped entirely when the driver is already installed.
+# =====================================================================
+$script:PolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
+$script:PolicyName = 'RestrictDriverInstallationToAdministrators'
+$script:PolicyOld  = 'UNTOUCHED'
+$script:PolicySet  = $false
+
+$queueDriver = $null
+try {
+    $qp = $PrinterPath.TrimStart('\').Split('\')
+    $queueDriver = (Get-Printer -ComputerName $qp[0] -Name $qp[1] -ErrorAction Stop).DriverName
+}
+catch {
+    Write-Host ('  Could not ask the server for the driver name: {0}' -f $_.Exception.Message) -ForegroundColor DarkGray
+}
+
+if ($queueDriver) {
+    $haveDriver = @(Get-PrinterDriver -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -eq $queueDriver }).Count -gt 0
+
+    if ($haveDriver) {
+        Write-Host ('  Driver already present: {0}' -f $queueDriver) -ForegroundColor DarkGray
+    }
+    else {
+        $isAdminish = $false
+        try {
+            $wi = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $isAdminish = $wi.IsSystem -or (New-Object Security.Principal.WindowsPrincipal($wi)).IsInRole(
+                            [Security.Principal.WindowsBuiltInRole]::Administrator)
+        }
+        catch { $isAdminish = $false }
+
+        if (-not $isAdminish) {
+            Write-Host '  Driver missing and this shell is not elevated - it can only be installed by the user, which is not possible unattended.' -ForegroundColor Yellow
+        }
+        else {
+            try {
+                if (Test-Path -LiteralPath $script:PolicyPath) {
+                    $cur = Get-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -ErrorAction SilentlyContinue
+                    if ($cur -and $null -ne $cur.$($script:PolicyName)) { $script:PolicyOld = $cur.$($script:PolicyName) }
+                }
+                $null = New-Item -Path $script:PolicyPath -Force
+                Set-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -Value 0 -Type DWord -Force
+                $script:PolicySet = $true
+                Write-Host ('  Driver missing ({0}) - allowing the print server to install it for this run.' -f $queueDriver) -ForegroundColor DarkGray
+                Write-Host '  (the previous policy value is restored when this finishes)' -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host ('  Could not set the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+            }
+        }
+    }
+}
+
 Say ('Payload:  {0}' -f $payloadFile)
 
 $ok = $false
@@ -536,6 +603,22 @@ try {
     }
 }
 finally {
+    # Put the PointAndPrint policy back exactly as it was, whatever happened.
+    if ($script:PolicySet) {
+        try {
+            if ($script:PolicyOld -eq 'UNTOUCHED') {
+                Remove-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -Value $script:PolicyOld -Type DWord -Force
+            }
+            Write-Host '  PointAndPrint policy restored.' -ForegroundColor DarkGray
+        }
+        catch {
+            Write-Host ('  WARNING: could not restore the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Red
+            Write-Host ('  Reset it by hand: {0} -> {1}' -f $script:PolicyPath, $script:PolicyName) -ForegroundColor Red
+        }
+    }
     # Never remove the payload while a deferred task may still be about to use it.
     if (-not $payloadKept) {
         Remove-Item -LiteralPath $payloadFile -Force -ErrorAction SilentlyContinue
