@@ -311,7 +311,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/39d91a30025845e326434dc2f0c6199610514fa0/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` exit. After each job it
@@ -327,6 +327,12 @@ That is what happens in a Commands tab that does not accept typed input.
 
 The tool URLs are pinned in `$Urls` at the top; republishing a tool means updating one
 line there.
+
+> **If a gist URL returns 404**, remove the `/raw/<sha>/` segment and use
+> `/raw/<file>` instead. GitHub's CDN caches a 404 against a revision-pinned path for a
+> gist whose revision it has not indexed yet, and the negative entry sticks. The unpinned
+> form always serves the latest published version.
+
 
 ---
 
