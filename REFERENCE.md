@@ -8,6 +8,50 @@ uploaded them, typically `C:\ProgramData\PrinterToolkit` after the first run.
 
 ---
 
+## 0a. ScreenConnect Commands tab: the 10-second kill
+
+The Commands tab (the web PowerShell box, as opposed to Backstage) **kills any command
+after 10 seconds** and truncates output at 10,000 characters. A bridging script looks
+like it "hangs and gives no result" when in fact it was killed mid-wait:
+
+```
+[14:04:20] Waiting for the user session...
+Killed after 10000 milliseconds.
+```
+
+The scheduled task it started keeps running (it belongs to the Task Scheduler service),
+so the work usually completes — you just lose the report.
+
+Fix: put these three lines at the **very top** of whatever you paste. They are
+ScreenConnect hashbang modifiers, read only by the Commands tab (in PowerShell they are
+ordinary `#` comments, so they are harmless anywhere else):
+
+```
+#!ps
+#timeout=600000
+#maxlength=1000000
+```
+
+`Printer-Setup-Paste.ps1` already includes them at the top. For the file-based scripts,
+paste the modifiers on their own lines first, then the command:
+
+```
+#!ps
+#timeout=600000
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer' -Verify
+```
+
+If a run was killed, clean up after it:
+
+```powershell
+Get-ScheduledTask -TaskName 'AddPrinter-*','PrinterSetup-*' -ErrorAction SilentlyContinue |
+    Unregister-ScheduledTask -Confirm:$false
+Get-ChildItem 'C:\ProgramData\PrinterToolkit' -Filter 'PrinterSetup-*.ps1' |
+    Remove-Item -Force
+```
+
+---
+
 ## 0. Running it — no `Set-ExecutionPolicy` step needed
 
 A `.ps1` **cannot** exempt itself: PowerShell checks the execution policy before it

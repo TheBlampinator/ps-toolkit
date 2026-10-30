@@ -1,7 +1,23 @@
+#!ps
+#timeout=600000
+#maxlength=1000000
+
 <#
     ================================================================
       PRINTER SETUP - paste the whole thing into PowerShell
     ================================================================
+
+      The three lines above are ScreenConnect "hashbang" modifiers.
+      They matter if you paste this into the Commands tab (the web
+      PowerShell box), which otherwise kills any command after 10
+      SECONDS and truncates output at 10,000 characters:
+
+        #!ps              send this to PowerShell instead of cmd
+        #timeout=600000   10 minutes instead of 10 seconds
+        #maxlength=...    full log instead of a truncated stub
+
+      In Backstage or a normal PowerShell window they are just
+      comments '#...' and are ignored, so nothing breaks there.
 
       Works in a ScreenConnect Backstage / Commands tab shell (SYSTEM)
       and also in a normal user PowerShell window.
