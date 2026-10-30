@@ -43,7 +43,7 @@ $version = '1.1.0'
 # Pinned to immutable revisions. Update these three lines only when
 # republishing a tool, and the menu picks up the new build.
 $Urls = [ordered]@{
-    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84c0d270f46e00119d2f60fb3348177a967423e9/Printer-Setup-Paste.ps1'
+    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/011829578609fea87f95d00a3610250efde326e3/Printer-Setup-Paste.ps1'
     PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/da21a3dc1828eaee7b49b7b5a8f29be69eaaee34/Printer-Check.ps1'
     OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
 }
@@ -110,6 +110,27 @@ function AskQueue {
             try { $ok = [System.Net.Dns]::GetHostAddresses($server)[0].IPAddressToString } catch { $ok = $null }
             if ($ok) {
                 Line "  server $server = $ok" -ForegroundColor DarkGray
+                # A 150-second printui stall is what a missing queue looks like, so
+                # ask the server what it actually publishes before running anything.
+                $leaf = ($v.TrimStart('\\') -split '\\')[1]
+                $shared = @()
+                try {
+                    $shared = @(Get-Printer -ComputerName $server -ErrorAction Stop |
+                                    Select-Object -ExpandProperty Name)
+                }
+                catch { $shared = @() }
+
+                if ($shared.Count -and ($shared -notcontains $leaf)) {
+                    Line ''
+                    Line "  '$server' does not share a queue called '$leaf'." -ForegroundColor Red
+                    Line '  It shares these:' -ForegroundColor Yellow
+                    $shared | Sort-Object | ForEach-Object { Line "    $_" -ForegroundColor Yellow }
+                    $anyway = AskYN -Prompt '  Use your address anyway?' -Default $false
+                    if ($null -eq $anyway) { return $null }
+                    if ($anyway) { return $v }
+                    continue
+                }
+                if ($shared.Count) { Line "  queue '$leaf' confirmed on $server" -ForegroundColor DarkGray }
                 return $v
             }
             Line ''

@@ -178,10 +178,20 @@ try {
                 Write-Log 'Trying printui.dll instead.'
             }
         }
+        else {
+            # Silent skip was a blind spot: with no log line it looked as though
+            # the cmdlet had been tried and failed.
+            Write-Log 'Add-PrinterConnection is not available on this machine - using printui.dll.'
+        }
         if (-not $added) {
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
             $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
                     -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
-            Write-Log ('printui /in exit code: {0}' -f $p.ExitCode)
+            $sw.Stop()
+            # printui returns 0 even when it adds nothing, so this number is only a
+            # hint; the registry read-back below is the real verdict.
+            Write-Log ('printui /in exit code: {0} (after {1:N1}s - 0 does not mean it worked)' -f `
+                        $p.ExitCode, $sw.Elapsed.TotalSeconds)
         }
         Start-Sleep -Seconds 2
     }
