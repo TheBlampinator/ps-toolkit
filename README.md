@@ -42,7 +42,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/f69be5e674760fc857b442e9e28712b651b14663/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/28dbff85cfa7da9849b311b7ddd4b24c08e934ad/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -84,7 +84,7 @@ put your printer's address there.
 #!ps
 #timeout=600000
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/2762bf643aeceab9dce73a6eb48d5f39a5149ea1/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/1b62f3f0ebdaeef4f40200b557d332b9df2329c9/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Step 3.** Paste all four lines into the Commands box and run it.

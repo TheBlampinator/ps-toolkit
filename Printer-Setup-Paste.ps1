@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.6.0'
+$scriptVersion = '1.7.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -181,8 +181,29 @@ try {
         else {
             # Silent skip was a blind spot: with no log line it looked as though
             # the cmdlet had been tried and failed.
-            Write-Log 'Add-PrinterConnection is not available on this machine - using printui.dll.'
+            Write-Log 'Add-PrinterConnection is not available on this machine (needs Windows 10 / Server 2016+).'
         }
+
+        # Second route: the WMI method, which exists on every Windows and returns a
+        # real error code. printui is kept only as a last resort because it reports
+        # success whatever happens and can stall for minutes.
+        if (-not $added) {
+            try {
+                $wmiSw = [System.Diagnostics.Stopwatch]::StartNew()
+                $r = Invoke-CimMethod -ClassName Win32_Printer `
+                        -MethodName AddWindowsPrinterConnection `
+                        -Arguments @{ PrinterPath = $PrinterPath } -ErrorAction Stop
+                $wmiSw.Stop()
+                Write-Log ('Win32_Printer.AddWindowsPrinterConnection returned {0} (after {1:N1}s)' -f `
+                            $r.ReturnValue, $wmiSw.Elapsed.TotalSeconds)
+                if ($r.ReturnValue -eq 0) { $added = $true; Write-Log 'WMI add reported success.' }
+                else { Write-Log 'WMI add failed - falling back to printui.dll.' }
+            }
+            catch {
+                Write-Log ('WMI add threw: {0} - falling back to printui.dll.' -f $_.Exception.Message)
+            }
+        }
+
         if (-not $added) {
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
             $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `

@@ -43,7 +43,7 @@ $version = '1.1.0'
 # Pinned to immutable revisions. Update these three lines only when
 # republishing a tool, and the menu picks up the new build.
 $Urls = [ordered]@{
-    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/2762bf643aeceab9dce73a6eb48d5f39a5149ea1/Printer-Setup-Paste.ps1'
+    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/1b62f3f0ebdaeef4f40200b557d332b9df2329c9/Printer-Setup-Paste.ps1'
     PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/da21a3dc1828eaee7b49b7b5a8f29be69eaaee34/Printer-Check.ps1'
     OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
 }
