@@ -19,6 +19,11 @@
       individual tool for the job you pick, so the tested scripts stay
       the single source of truth.
 
+      Nothing is ever written to disk and nothing is ever run as a
+      .ps1 file, so this works on PCs where the execution policy
+      blocks scripts - the policy applies to files, not to code that
+      only ever existed as text.
+
       Requires a console it can ask questions in (Backstage, or an
       interactive PowerShell window). If there is none - some Commands
       tab setups - it prints the ready-made command for each job
@@ -105,29 +110,29 @@ function AskQueue {
     return $null
 }
 
-# Download a tool to TEMP and return its path (or just say what would happen).
-function Get-Tool {
+# Fetch a tool as TEXT. Never write it to disk: a .ps1 file is subject to the
+# execution policy, but code that never existed as a file is not - which is the
+# same reason pasting this menu works on a machine that blocks scripts.
+function Get-ToolText {
     param([string]$Key)
-    $name = @{
-        PrinterSetup = 'Printer-Setup-Paste.ps1'
-        PrinterCheck = 'Printer-Check.ps1'
-        OneDrive     = 'Reset-OneDriveLink-2.ps1'
-    }[$Key]
-    $dest = Join-Path $env:TEMP $name
-    if ($DryRun) { Say "DRY RUN - would download $Key to $dest"; return $dest }
+    if ($DryRun) {
+        Say ('DRY RUN - would fetch ' + $Key)
+        # A stub so the job continues and Run-ToolText can report what it would do.
+        # It is never executed: Run-ToolText returns before creating the block.
+        return "param([string]`$Account, [switch]`$NoRestart) 'stub'"
+    }
     Write-Host '  fetching the tool...' -ForegroundColor DarkGray
     try {
-        Invoke-WebRequest -Uri $Urls[$Key] -OutFile $dest -UseBasicParsing
+        return (Invoke-RestMethod -Uri $Urls[$Key])
     }
     catch {
         Line ''
         Line '  Could not download the tool for this job.' -ForegroundColor Red
         Line "  $($_.Exception.Message)" -ForegroundColor DarkGray
         Line '  Either the PC cannot reach gist.githubusercontent.com, or a proxy is' -ForegroundColor Yellow
-        Line '  blocking it. Save the file locally and run it instead.' -ForegroundColor Yellow
+        Line '  blocking it.' -ForegroundColor Yellow
         return $null
     }
-    return $dest
 }
 
 # Clear every variable this toolkit uses, so one job cannot inherit the
@@ -140,10 +145,13 @@ function Reset-Env {
     }
 }
 
-function Run-Tool {
-    param([string]$Path, [string[]]$Arguments = @())
+function Run-ToolText {
+    param([string]$Text, [string]$Account, [switch]$NoRestart)
     if ($DryRun) {
-        Say ('DRY RUN - would run: {0} {1}' -f $Path, ($Arguments -join ' '))
+        $shown = ''
+        if ($Account)  { $shown = "-Account $Account" }
+        if ($NoRestart) { $shown = ($shown + ' -NoRestart').Trim() }
+        Say ('DRY RUN - would run the {0} tool {1}' -f $script:CurrentTool, $shown)
         foreach ($n in 'PrinterSetupPath','PrinterSetupDefault','PrinterSetupElevated',
                        'PrinterSetupUser','PrinterCheckPath','PrinterCheckUser') {
             $v = [Environment]::GetEnvironmentVariable($n)
@@ -151,7 +159,15 @@ function Run-Tool {
         }
         return
     }
-    & $Path @Arguments
+    # Created from text, so there is no file and no execution-policy check.
+    # Parameters are passed by name here rather than splatted: a hashtable
+    # splat on a scriptblock invocation binds as ONE positional argument.
+    $block = [scriptblock]::Create($Text)
+    if ($Account) {
+        if ($NoRestart) { & $block -Account $Account -NoRestart }
+        else            { & $block -Account $Account }
+    }
+    else { & $block }
 }
 
 # ---- the jobs --------------------------------------------------------------
@@ -170,8 +186,9 @@ function Job-AddPrinter {
     $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
     if ($null -eq $user) { return }
 
-    $tool = Get-Tool -Key PrinterSetup
-    if (-not $tool) { return }
+    $script:CurrentTool = 'printer setup'
+    $text = Get-ToolText -Key PrinterSetup
+    if (-not $text) { return }
 
     Reset-Env
     $env:PrinterSetupPath = $queue
@@ -184,7 +201,7 @@ function Job-AddPrinter {
     if (-not $isDefault) { Say '  (leaving their current default printer alone)' }
     if ($elevated)       { Say '  (using admin rights, because the driver is missing)' }
     Line ''
-    Run-Tool -Path $tool
+    Run-ToolText -Text $text
 }
 
 function Job-CheckPrinters {
@@ -196,15 +213,16 @@ function Job-CheckPrinters {
     $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
     if ($null -eq $user) { return }
 
-    $tool = Get-Tool -Key PrinterCheck
-    if (-not $tool) { return }
+    $script:CurrentTool = 'printer check'
+    $text = Get-ToolText -Key PrinterCheck
+    if (-not $text) { return }
 
     Reset-Env
     if ($queue) { $env:PrinterCheckPath = $queue } else { $env:PrinterCheckPath = 'list' }
     if ($user)  { $env:PrinterCheckUser = $user }
 
     Line ''
-    Run-Tool -Path $tool
+    Run-ToolText -Text $text
 }
 
 function Job-OneDrive {
@@ -233,15 +251,13 @@ function Job-OneDrive {
         Line '  not deleted, and no folders are re-downloaded.' -ForegroundColor Yellow
     }
 
-    $tool = Get-Tool -Key OneDrive
-    if (-not $tool) { return }
+    $script:CurrentTool = 'OneDrive'
+    $text = Get-ToolText -Key OneDrive
+    if (-not $text) { return }
 
     Reset-Env
-    $toolArgs = @('-Account', $account)
-    if (-not $restart) { $toolArgs += '-NoRestart' }
-
     Line ''
-    Run-Tool -Path $tool -Arguments $toolArgs
+    Run-ToolText -Text $text -Account $account -NoRestart:(-not $restart)
 }
 
 # ---- fallback when there is no console to ask in ---------------------------
