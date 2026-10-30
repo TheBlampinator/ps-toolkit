@@ -89,7 +89,11 @@ irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e
 
 **Step 3.** Paste all four lines into the Commands box and run it.
 
-**Step 4.** Read the result. It will say one of these:
+**Step 4.** Wait for it. If the PC has never printed to that queue, the tool installs the
+printer's driver first — automatically, from the print server, with no window to click. That
+can take a minute the first time on each PC, and seconds after that.
+
+**Step 5.** Read the result. It will say one of these:
 
 ```
 [14:02:13] RESULT: CONNECTED - \\PRINTSERVER\QUEUE-NAME is on the printer list.
@@ -113,12 +117,20 @@ or
 ```
 ERROR: ... Access is denied ...
 ```
-The printer's software (the "driver") is not on this PC and Windows will not let a
-normal user install it. Re-run with this extra line second from the top:
+The printer's software (the "driver") is not on this PC **and** the tool could not install
+it by itself.
+
+Usually you will never see this: the tool copies the driver from the print server
+(`\\SERVER\print$`) and installs it before connecting, with no dialog and no input from
+you. This message means that failed — the server's driver share is not readable, or its
+`.inf` is not there. Re-run with this extra line second from the top:
 
 ```
 $env:PrinterSetupElevated = 'true'
 ```
+
+If it still fails, the driver has to be put on the machine once by other means — see
+[REFERENCE.md §1b](REFERENCE.md#1b-printer-setup-pasteps1--no-upload-just-paste).
 
 ### The four lines, explained
 
@@ -205,7 +217,8 @@ they are at lunch.
 | `Killed after 10000 milliseconds` | ScreenConnect stopped the command after 10 seconds. | Check the four lines have no blank line between them. The work may still have happened — read the result (below). |
 | `STOPPED - ... NOTHING WAS CHANGED` | A setting was missing or the address was malformed. | Read the message, it shows the exact line to type. |
 | `Missing type name after '['` | You pasted *output* instead of the script. | The real script starts with `#!ps`. Clear the box and paste again. |
-| `Access is denied` | The printer's driver cannot be installed by a normal user. | Add the `$env:PrinterSetupElevated = 'true'` line. |
+| `Access is denied` | The driver could not be installed automatically. | Add `$env:PrinterSetupElevated = 'true'`. |
+| `0x800704C7` / "canceled by the user" | Windows asked for permission to install the driver and nobody was there to click. | Should no longer happen — the tool installs the driver itself. If it does, the print server's `print$` share is not readable. |
 | `More than one user is logged on` | Two people are signed in; the script will not guess. | Add `$env:PrinterSetupUser = 'DOMAIN\name'`. |
 | `Nobody is logged on` | There is no user session to fix. | Ask them to sign in first. |
 | `VERDICT: ABSENT` | The printer really is not there. | Add it. |

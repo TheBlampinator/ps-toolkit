@@ -239,12 +239,31 @@ What it does:
 5. Deletes the payload script and the task — unless it deferred to a later read, in which
    case both are kept and their paths printed.
 
-**Drivers, unattended.** Windows 11 24H2+ asks for consent to install a printer driver the
-machine does not have, and a background run cannot answer that dialog - the connection then
-fails with `0x800704C7`. Drop the vendor's `.inf` package in
-`C:\ProgramData\PrinterToolkit\drivers` (via the Backstage file manager) and the tool
-installs it silently as SYSTEM before connecting, then verifies it with `Get-PrinterDriver`.
-No prompt, no user contact. Override the location with `$env:PrinterSetupDriverSource`.
+**Drivers, unattended — three tiers.** Windows 11 24H2+ asks for consent to install a
+printer driver the machine does not have, and a background run cannot answer that dialog:
+the connection fails with `0x800704C7` (ERROR_CANCELLED). So before connecting, the tool
+installs the driver itself, machine-wide, as SYSTEM:
+
+1. **Copies it from the print server's own share** — `\\SERVER\print$\x64` — and installs
+   it with `pnputil /add-driver ... /install`. This is the same driver package
+   Point-and-Print would fetch; doing it directly means no dialog. Nothing to stage by hand.
+2. **Staged `.inf`, if present** — anything in `C:\ProgramData\PrinterToolkit\drivers`,
+   or `$env:PrinterSetupDriverSource`, is installed the same way. The vendor package is only
+   needed if the server's `print$` is not readable.
+3. **Last resort** — `RestrictDriverInstallationToAdministrators` is set to `0` for the
+   length of the run so Windows may install it itself. The previous value is restored in a
+   `finally` block; if restoring ever fails, the log says so in red with the key path.
+
+Verified with `Get-PrinterDriver` before the connection is attempted, so a missing driver is
+reported as a missing driver rather than as a failed connection.
+
+The connection then tries five routes in order, logging a breadcrumb before each so the last
+line of a log names what was running when it stopped: `Add-PrinterConnection` →
+`[wmiclass] Win32_Printer` → `Add-Printer -ConnectionName` → `WScript.Network` COM →
+`printui.dll`. Windows 11 24H2+ has dropped the first two, and `printui` reports success
+whatever happens, which is why the registry read-back — not any exit code — decides the result.
+
+Already-connected runs are safe: `Already connected for this user - not adding again.`
 
 Run it from the Commands tab with the `#timeout` modifiers on the first lines (§0a): the
 default 10-second kill is shorter than a first-time driver install.
