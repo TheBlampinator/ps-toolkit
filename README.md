@@ -28,7 +28,7 @@ file to upload, nothing to install.
 You need two things:
 
 1. **The printer's address**, which looks like `\\SERVER\QUEUE`.
-   For example `\\print01\Reception printer`. If you do not know it, someone in IT can
+   For example `\\PRINTSERVER\QUEUE-NAME`. If you do not know it, someone in IT can
    give it to you, or you can list them (see [Check what printers they have](#check-what-printers-they-have)).
 2. **The person logged in to the PC** — the script works on whoever is logged on, so do
    not run it while nobody is signed in.
