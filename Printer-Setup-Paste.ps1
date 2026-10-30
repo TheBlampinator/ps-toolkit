@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.7.0'
+$scriptVersion = '1.8.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -154,6 +154,7 @@ try {
     if ($ident.IsSystem) { throw 'Refusing to run as SYSTEM - the printer would be added for SYSTEM, not the user.' }
 
     Write-Log ('Printer setup for {0}\{1} on {2}' -f $env:USERDOMAIN, $env:USERNAME, $env:COMPUTERNAME)
+    Write-Log ('Windows:  {0} build {1}' -f ([Environment]::OSVersion.VersionString), ([Environment]::OSVersion.Version.Build))
     Write-Log ('Identity: {0}' -f $ident.Name)
     Write-Log ('Queue:    {0}' -f $PrinterPath)
 
@@ -184,9 +185,27 @@ try {
             Write-Log 'Add-PrinterConnection is not available on this machine (needs Windows 10 / Server 2016+).'
         }
 
-        # Second route: the WMI method, which exists on every Windows and returns a
-        # real error code. printui is kept only as a last resort because it reports
-        # success whatever happens and can stall for minutes.
+        # Second route: the WMI method, which exists on every Windows and returns a real
+        # error code instead of printui's meaningless 0.
+        # It is a STATIC method, so Invoke-CimMethod -ClassName cannot see it on older
+        # builds; the [wmiclass] accelerator can, and that is what Windows PowerShell 5.1
+        # offers. Both are tried, then printui as the last resort.
+        if (-not $added) {
+            try {
+                $wmiSw = [System.Diagnostics.Stopwatch]::StartNew()
+                $wc = [wmiclass]'Win32_Printer'
+                $res = $wc.AddWindowsPrinterConnection($PrinterPath)
+                $wmiSw.Stop()
+                $code = if ($res -and $null -ne $res.ReturnValue) { $res.ReturnValue } else { -1 }
+                Write-Log ('Win32_Printer.AddWindowsPrinterConnection (wmiclass) returned {0} after {1:N1}s' -f `
+                            $code, $wmiSw.Elapsed.TotalSeconds)
+                if ($code -eq 0) { $added = $true; Write-Log 'WMI add reported success.' }
+            }
+            catch {
+                Write-Log ('wmiclass route failed: {0}' -f $_.Exception.Message)
+            }
+        }
+
         if (-not $added) {
             try {
                 $wmiSw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -194,13 +213,12 @@ try {
                         -MethodName AddWindowsPrinterConnection `
                         -Arguments @{ PrinterPath = $PrinterPath } -ErrorAction Stop
                 $wmiSw.Stop()
-                Write-Log ('Win32_Printer.AddWindowsPrinterConnection returned {0} (after {1:N1}s)' -f `
+                Write-Log ('Win32_Printer.AddWindowsPrinterConnection (CIM) returned {0} after {1:N1}s' -f `
                             $r.ReturnValue, $wmiSw.Elapsed.TotalSeconds)
                 if ($r.ReturnValue -eq 0) { $added = $true; Write-Log 'WMI add reported success.' }
-                else { Write-Log 'WMI add failed - falling back to printui.dll.' }
             }
             catch {
-                Write-Log ('WMI add threw: {0} - falling back to printui.dll.' -f $_.Exception.Message)
+                Write-Log ('CIM route failed: {0}' -f $_.Exception.Message)
             }
         }
 
