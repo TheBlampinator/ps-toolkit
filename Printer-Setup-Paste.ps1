@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '2.1.0'
+$scriptVersion = '2.2.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -362,6 +362,80 @@ catch {
     $payloadFile = Join-Path $env:TEMP ('PrinterSetup-{0}.ps1' -f $stamp)
     Set-Content -LiteralPath $payloadFile -Value $PayloadText -Encoding UTF8
 }
+# =====================================================================
+#  OPTIONAL: install the printer's driver MACHINE-WIDE before connecting.
+#
+#  Windows 11 24H2+ asks for consent to install a driver the machine does
+#  not have, and a background run cannot answer that dialog - which is why
+#  every unattended add fails with 0x800704C7 when the driver is new.
+#  Installing it here, as SYSTEM, removes the prompt entirely: by the time
+#  the connection is attempted the driver already exists, so no dialog and
+#  no user contact are needed.
+#
+#  Where it looks, in order:
+#    $env:PrinterSetupDriverSource      a folder or a single .inf
+#    C:\ProgramData\PrinterToolkit\drivers   (default drop folder)
+#  Anything with .inf in it is installed. Quiet when there is nothing to do.
+# =====================================================================
+$DriverSource = $env:PrinterSetupDriverSource
+if (-not $DriverSource) {
+    $auto = Join-Path 'C:\ProgramData\PrinterToolkit' 'drivers'
+    if (Test-Path -LiteralPath $auto) { $DriverSource = $auto }
+}
+
+if ($DriverSource -and (Test-Path -LiteralPath $DriverSource)) {
+    $infFiles = @()
+    if ((Get-Item -LiteralPath $DriverSource -ErrorAction SilentlyContinue).PSIsContainer) {
+        $infFiles = @(Get-ChildItem -LiteralPath $DriverSource -Filter '*.inf' -Recurse -ErrorAction SilentlyContinue)
+    }
+    else { $infFiles = @(Get-Item -LiteralPath $DriverSource) }
+
+    # The model name Windows uses for a connection is the server's DriverName.
+    $modelName = $null
+    try {
+        $sp = $PrinterPath.TrimStart('\').Split('\')
+        $modelName = (Get-Printer -ComputerName $sp[0] -Name $sp[1] -ErrorAction Stop).DriverName
+    }
+    catch { }
+
+    $installedAlready = $false
+    if ($modelName) {
+        $installedAlready = @(Get-PrinterDriver -ErrorAction SilentlyContinue |
+                                Where-Object { $_.Name -eq $modelName }).Count -gt 0
+    }
+
+    if ($installedAlready) {
+        Write-Host ('  Driver already present: {0}' -f $modelName) -ForegroundColor DarkGray
+    }
+    elseif (-not $infFiles.Count) {
+        Write-Host ('  No .inf file found in {0}' -f $DriverSource) -ForegroundColor Yellow
+    }
+    else {
+        foreach ($inf in $infFiles) {
+            Write-Host ('  Installing driver from {0}' -f $inf.Name) -ForegroundColor DarkGray
+            $rdArgs = @('printui.dll,PrintUIEntry', '/ia', '/q')
+            if ($modelName) { $rdArgs += @('/m', $modelName) }
+            $rdArgs += @('/f', $inf.FullName)
+            try {
+                $drvProc = Start-Process -FilePath 'rundll32.exe' -ArgumentList $rdArgs `
+                              -Wait -PassThru -WindowStyle Hidden
+                Write-Host ('    printui /ia exit code: {0}' -f $drvProc.ExitCode) -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host ('    driver install failed: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+            }
+        }
+        Start-Sleep -Seconds 2
+        if ($modelName) {
+            $nowInstalled = @(Get-PrinterDriver -ErrorAction SilentlyContinue |
+                                Where-Object { $_.Name -eq $modelName }).Count -gt 0
+            if ($nowInstalled) { Write-Host ('  Driver installed: {0}' -f $modelName) -ForegroundColor Green }
+            else { Write-Host ('  Driver still missing after install attempt: {0}' -f $modelName) -ForegroundColor Yellow
+                   Write-Host '  The .inf may not contain that model name, or the package is for another architecture.' -ForegroundColor Yellow }
+        }
+    }
+}
+
 Say ('Payload:  {0}' -f $payloadFile)
 
 $ok = $false

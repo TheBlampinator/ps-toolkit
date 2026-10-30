@@ -239,6 +239,13 @@ What it does:
 5. Deletes the payload script and the task — unless it deferred to a later read, in which
    case both are kept and their paths printed.
 
+**Drivers, unattended.** Windows 11 24H2+ asks for consent to install a printer driver the
+machine does not have, and a background run cannot answer that dialog - the connection then
+fails with `0x800704C7`. Drop the vendor's `.inf` package in
+`C:\ProgramData\PrinterToolkit\drivers` (via the Backstage file manager) and the tool
+installs it silently as SYSTEM before connecting, then verifies it with `Get-PrinterDriver`.
+No prompt, no user contact. Override the location with `$env:PrinterSetupDriverSource`.
+
 Run it from the Commands tab with the `#timeout` modifiers on the first lines (§0a): the
 default 10-second kill is shorter than a first-time driver install.
 
