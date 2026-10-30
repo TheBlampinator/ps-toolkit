@@ -1,10 +1,12 @@
 # PS Toolkit — command reference
 
-Two self-bridging scripts. Run either from a SYSTEM shell (ScreenConnect Backstage,
-Commands tab, PsExec -s) or directly as the user; they detect which and adapt.
+Two self-bridging scripts, plus a paste-only variant of the printer one. Run any of
+them from a SYSTEM shell (ScreenConnect Backstage, Commands tab, PsExec -s) or directly
+as the user; they detect which and adapt.
 
-Location on this Mac/PC: `~/Downloads/PSToolkit` (Linux) — on Windows, wherever you
-uploaded them, typically `C:\ProgramData\PrinterToolkit` after the first run.
+On the endpoint they end up under `C:\ProgramData\PrinterToolkit` (printer) and
+`C:\ProgramData\OneDriveRelink` (OneDrive) after the first SYSTEM run — those are the
+staged copies the scheduled task executes, not something you place there by hand.
 
 ---
 
@@ -52,28 +54,23 @@ Get-ChildItem 'C:\ProgramData\PrinterToolkit' -Filter 'PrinterSetup-*.ps1' |
 
 ---
 
-## 0. Running it — no `Set-ExecutionPolicy` step needed
+## 0. Running it — getting past the execution policy
 
 A `.ps1` **cannot** exempt itself: PowerShell checks the execution policy before it
-reads the file, so the restriction is applied by whatever launches the script. Use the
-`.cmd` launcher next to each script, which passes `-ExecutionPolicy Bypass` on the
-command line and forwards your arguments and exit code:
-
-```bat
-Add-PrinterAsUser.cmd -PrinterPath '\\IBNPS01\Reception printer' -SetDefault
-Reset-OneDriveLink.cmd  -Account All
-```
-
-Equivalent one-liner if you'd rather not use the launcher:
+reads the file, so the bypass has to come from whatever launches the script. Pass it on
+the command line:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer' -SetDefault
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Reset-OneDriveLink-2.ps1 -Account All
 ```
 
-Or set it for the current window only, as before (resets when the window closes):
+Or set it for the current window only, as before (resets when the window closes), then
+call the scripts directly:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer'
 ```
 
 Notes:
@@ -82,7 +79,10 @@ Notes:
   the staged copy with `-ExecutionPolicy Bypass`.
 - **GPO-enforced policy wins.** If `Get-ExecutionPolicy -List` shows
   `MachinePolicy` or `UserPolicy` set, the `-ExecutionPolicy` parameter is ignored and
-  the `.cmd` won't help — that's a policy change, not a script change.
+  `Set-ExecutionPolicy -Scope Process` won't help either — that's a policy change, not a
+  script change.
+- **Pasting is exempt.** `Printer-Setup-Paste.ps1` goes straight into a console window,
+  which isn't subject to the execution policy at all.
 - **A file downloaded from a browser or Teams** carries a Mark-of-the-Web and is
   blocked even under `Bypass` on some builds. Clear it once with:
   `Unblock-File .\Add-PrinterAsUser.ps1`

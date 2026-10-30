@@ -1,8 +1,9 @@
 # ps-toolkit
 
-Two PowerShell scripts that fix **per-user** state on Windows when your only shell is
-`NT AUTHORITY\SYSTEM` — ScreenConnect Backstage, the ConnectWise Control Commands tab
-or Toolbox, `PsExec -s`, most RMM agents.
+Two self-bridging PowerShell scripts that fix **per-user** state on Windows when your
+only shell is `NT AUTHORITY\SYSTEM` — ScreenConnect Backstage, the ConnectWise Control
+Commands tab or Toolbox, `PsExec -s`, most RMM agents. Plus a paste-only variant of the
+printer script for when nothing can be uploaded.
 
 | Script | Does |
 |---|---|
@@ -12,16 +13,23 @@ or Toolbox, `PsExec -s`, most RMM agents.
 
 Full command reference: **[REFERENCE.md](REFERENCE.md)**
 
-> ### Blocked from running the script? Do this first
+> ### Blocked by the execution policy?
+>
+> PowerShell checks the policy before it reads the file, so the bypass has to come from
+> whatever launches the script. Put it on the command line:
+>
+> ```powershell
+> powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
+>     -PrinterPath '\\print01\FIN-HP4525'
+> ```
+>
+> Or set it for the current window only (resets when the window closes):
 >
 > ```powershell
 > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 > ```
 >
-> Same window as the script — it resets when the window closes, and it's the quickest
-> way past the execution-policy error. Or skip it entirely and use the `.cmd` launcher
-> (`Add-PrinterAsUser.cmd`), which applies the bypass for you. Details and caveats:
-> [REFERENCE.md §0](REFERENCE.md#0-running-it--no-set-executionpolicy-step-needed).
+> Details and caveats: [REFERENCE.md §0](REFERENCE.md#0-running-it--getting-past-the-execution-policy).
 
 ## The problem these solve
 
@@ -48,24 +56,31 @@ bridge; SYSTEM is only the launcher.
 
 ## Quick start
 
-Use the `.cmd` launcher next to each script — it applies
-`-ExecutionPolicy Bypass` for you, so there is no `Set-ExecutionPolicy` step:
-
-```bat
-Add-PrinterAsUser.cmd -PrinterPath '\\print01\FIN-HP4525' -SetDefault
-Add-PrinterAsUser.cmd -PrinterPath '\\print01\FIN-HP4525' -Verify
-Reset-OneDriveLink.cmd -Account All
-```
-
-Or call the `.ps1` directly with the bypass explicit (a script cannot exempt itself —
-the policy is applied before the file is read):
+PowerShell checks the execution policy before it reads a script, so a `.ps1` can't
+exempt itself — the bypass has to come from the command line:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
     -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
+    -PrinterPath '\\print01\FIN-HP4525' -Verify
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Reset-OneDriveLink-2.ps1 -Account All
 ```
 
-Both refuse to run rather than degrading to SYSTEM: the payload throws if it finds
+Already in a PowerShell window you control? Unblock the window once, then call the
+scripts directly:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+```
+
+No file on the box at all? Paste `Printer-Setup-Paste.ps1` into an interactive
+session — typing into the console isn't subject to the execution policy.
+
+Both scripts refuse to run rather than degrading to SYSTEM: the payload throws if it finds
 itself as SYSTEM, and `-Verify` checks the *user's* hive, not SYSTEM's.
 
 ## Exit 0 means verified
