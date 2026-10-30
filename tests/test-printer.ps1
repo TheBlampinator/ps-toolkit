@@ -79,20 +79,20 @@ function Check($name, $cond, $detail) {
     else { Write-Host "  FAIL  $name  $(if ($detail) { '-> ' + $detail })"; $script:fail++ }
 }
 
-Check 'reg name \\print01\FIN-HP4525' `
-    ((Get-ConnectionRegistryName -UncPath '\\print01\FIN-HP4525') -eq ',,print01,FIN-HP4525') `
-    (Get-ConnectionRegistryName -UncPath '\\print01\FIN-HP4525')
+Check 'reg name \\PRINTSERVER\QUEUE-NAME' `
+    ((Get-ConnectionRegistryName -UncPath '\\PRINTSERVER\QUEUE-NAME') -eq ',,PRINTSERVER,QUEUE-NAME') `
+    (Get-ConnectionRegistryName -UncPath '\\PRINTSERVER\QUEUE-NAME')
 Check 'reg name with spaces' `
     ((Get-ConnectionRegistryName -UncPath '\\PRINT-SRV\Canon iR-ADV C5535') -eq ',,PRINT-SRV,Canon iR-ADV C5535')
-Check 'regex accepts \\srv\queue'  ('\\print01\FIN-HP4525' -match '^\\\\[^\\]+\\[^\\]+$')
-Check 'regex rejects bare host'    ('print01' -notmatch '^\\\\[^\\]+\\[^\\]+$')
-Check 'regex rejects single UNC'   ('\\print01' -notmatch '^\\\\[^\\]+\\[^\\]+$')
-Check 'regex rejects subst path'   ('\\print01\q\sub' -notmatch '^\\\\[^\\]+\\[^\\]+$')
-Check 'TrimEnd removes trailing \' (('\\print01\FIN-HP4525\').TrimEnd('\') -eq '\\print01\FIN-HP4525')
+Check 'regex accepts \\srv\queue'  ('\\PRINTSERVER\QUEUE-NAME' -match '^\\\\[^\\]+\\[^\\]+$')
+Check 'regex rejects bare host'    ('PRINTSERVER' -notmatch '^\\\\[^\\]+\\[^\\]+$')
+Check 'regex rejects single UNC'   ('\\PRINTSERVER' -notmatch '^\\\\[^\\]+\\[^\\]+$')
+Check 'regex rejects subst path'   ('\\PRINTSERVER\q\sub' -notmatch '^\\\\[^\\]+\\[^\\]+$')
+Check 'TrimEnd removes trailing \' (('\\PRINTSERVER\QUEUE-NAME\').TrimEnd('\') -eq '\\PRINTSERVER\QUEUE-NAME')
 
 Write-Host "`n============ BRIDGE RUN ============`n"
 # Timeout kept short so a regression in the wait condition fails fast instead of hanging.
-$out = (Invoke-AsLoggedOnUser -User $null -PrinterPath '\\print01\FIN-HP4525' -SetDefault -TimeoutSeconds 10 6>&1 | Out-String)
+$out = (Invoke-AsLoggedOnUser -User $null -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault -TimeoutSeconds 10 6>&1 | Out-String)
 Write-Host $out
 
 Write-Host "`n============ BRIDGE ASSERTIONS ============`n"
@@ -102,7 +102,7 @@ Check 'run level Limited by default'     ($Rec.principal.RunLevel -eq 'Limited')
 Check 'runs on battery'                  ($Rec.settings.AllowStartIfOnBatteries)
 Check 'executable powershell.exe'        ($Rec.action.Execute -eq 'powershell.exe')
 Check 'arg has -Payload'                 ($Rec.action.Argument -match '-Payload')
-Check 'printer path quoted in arg'       ($Rec.action.Argument -match '-PrinterPath "\\\\print01\\FIN-HP4525"')
+Check 'printer path quoted in arg'       ($Rec.action.Argument -match '-PrinterPath "\\\\PRINTSERVER\\QUEUE-NAME"')
 Check 'arg has -SetDefault'              ($Rec.action.Argument -match '-SetDefault')
 Check 'no -Remove when adding'           ($Rec.action.Argument -notmatch '-Remove')
 Check 'task registered'                  ($null -ne $Rec.registered)
@@ -116,15 +116,15 @@ Write-Host "`n  argument line:`n    $($Rec.action.Argument)"
 
 # --- -Elevated must flip the run level --------------------------------------
 $Rec.principal = $null
-Invoke-AsLoggedOnUser -User 'CONTOSO\jsmith' -PrinterPath '\\print01\FIN-HP4525' -Elevated -TimeoutSeconds 30 | Out-Null
+Invoke-AsLoggedOnUser -User 'CONTOSO\jsmith' -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Elevated -TimeoutSeconds 30 | Out-Null
 Check 'Elevated -> RunLevel Highest'     ($Rec.principal.RunLevel -eq 'Highest')
 
 # --- -Verify must propagate to the user-session payload ---------------------
 $Rec.action = $null
-Invoke-AsLoggedOnUser -User 'CONTOSO\jsmith' -PrinterPath '\\print01\FIN-HP4525' -Verify -TimeoutSeconds 30 | Out-Null
+Invoke-AsLoggedOnUser -User 'CONTOSO\jsmith' -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify -TimeoutSeconds 30 | Out-Null
 Check 'arg has -Verify'                  ($Rec.action.Argument -match '-Verify')
 Check 'Verify still marks -Payload'      ($Rec.action.Argument -match '-Payload')
-Check 'Verify carries printer path'      ($Rec.action.Argument -match 'FIN-HP4525')
+Check 'Verify carries printer path'      ($Rec.action.Argument -match 'QUEUE-NAME')
 
 Write-Host "`n  failures: $fail`n"
 exit $fail

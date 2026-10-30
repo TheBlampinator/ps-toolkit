@@ -22,7 +22,7 @@ Full command reference: **[REFERENCE.md](REFERENCE.md)**
 >
 > ```powershell
 > powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
->     -PrinterPath '\\print01\FIN-HP4525'
+>     -PrinterPath '\\PRINTSERVER\QUEUE-NAME'
 > ```
 >
 > Or set it for the current window only (resets when the window closes):
@@ -63,10 +63,10 @@ exempt itself — the bypass has to come from the command line:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
-    -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+    -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
-    -PrinterPath '\\print01\FIN-HP4525' -Verify
+    -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Reset-OneDriveLink-2.ps1 -Account All
 ```
@@ -76,7 +76,7 @@ scripts directly:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 ```
 
 No file on the box at all? Paste `Printer-Setup-Paste.ps1` into an interactive
@@ -119,7 +119,7 @@ themselves through a scheduled task, so they need a real file path. Two statemen
 ```powershell
 $f = "$env:TEMP\Add-PrinterAsUser.ps1"
 irm https://gist.githubusercontent.com/TheBlampinator/42000b8cddae47063f738a8a214ca883/raw/Add-PrinterAsUser.ps1 -OutFile $f
-& $f -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+& $f -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 ```
 
 ```powershell

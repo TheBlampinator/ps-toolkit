@@ -29,7 +29,7 @@
          and exits non-zero if the connection really isn't there.
 
 .PARAMETER PrinterPath
-    UNC path of the shared printer, e.g. \\print01\FIN-HP4525. Required.
+    UNC path of the shared printer, e.g. \\PRINTSERVER\QUEUE-NAME. Required.
 
 .PARAMETER SetDefault
     Make it the user's default printer after adding.
@@ -58,21 +58,21 @@
     Internal. Set by the scheduled task. Do not pass it.
 
 .EXAMPLE
-    .\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525'
+    .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME'
     From Backstage: adds it for the logged-on user.
 
 .EXAMPLE
-    .\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+    .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 
 .EXAMPLE
-    .\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Elevated
+    .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Elevated
     When the driver isn't on the box yet and non-admin driver install is blocked.
 
 .EXAMPLE
-    .\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Remove
+    .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Remove
 
 .EXAMPLE
-    .\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -User 'CONTOSO\jsmith'
+    .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -User 'CONTOSO\jsmith'
     From Backstage when several users are logged on.
 #>
 [CmdletBinding()]

@@ -13,39 +13,36 @@
       it prints how to read the result a few seconds later. Nothing is
       lost: the user-session payload writes a log and keeps going.
 
-      The three lines at the top are ScreenConnect hashbang modifiers.
-      #!ps works everywhere; #timeout is ignored by some builds, which
-      is why the script tolerates being killed.
+      The lines at the top are ScreenConnect hashbang modifiers. They MUST
+      be contiguous on the first lines - a blank line between them and
+      only the first is applied, which silently leaves the 10-second kill
+      in place. Confirmed on 26.7.6.9783.
 
       Works pasted into the Commands tab, Backstage, or a user window.
 
-      EDIT ONLY THE CONFIG BLOCK BELOW, then paste the entire file.
-      No file upload, no execution policy change: commands pasted into
-      an interactive session are not subject to the policy.
+      NOTHING IS BUILT IN. This script will not run until you set
+      $env:PrinterSetupPath - it prints exactly what to type. No file
+      upload, no execution policy change: pasted commands are not
+      subject to the policy.
     ================================================================
 #>
 
-# =========================== CONFIG ============================
-$PrinterPath = '\\IBNPS01\Reception Printer'   # <-- CHANGE THIS: \\server\printer
-$SetDefault  = $true                            # make it the user's default printer
+# =====================================================================
+#  SETTINGS - ENVIRONMENT VARIABLES ONLY. There is no printer name in
+#  this file on purpose: nothing site-specific, nothing to edit.
+# =====================================================================
+$SetDefault  = $true                            # set it as the user's default
 $Elevated    = $false                           # $true only if the driver won't install
 $User        = ''                               # blank = whoever is logged on
-$WaitSeconds = 4                                # how long to wait before deferring
-# ===============================================================
+$WaitSeconds = 25                               # needs #timeout in the Commands tab
 
-# Optional overrides, so the one-liner form can be reused without editing anything:
-#   $env:PrinterSetupPath     = '\\server\queue'
-#   $env:PrinterSetupElevated = 'true'
-#   $env:PrinterSetupDefault  = 'false'
-#   $env:PrinterSetupUser     = 'DOMAIN\name'
-if ($env:PrinterSetupPath)                { $PrinterPath = $env:PrinterSetupPath }
 if ($env:PrinterSetupElevated -eq 'true')  { $Elevated    = $true }
 if ($env:PrinterSetupDefault -eq 'false')  { $SetDefault  = $false }
-if ($env:PrinterSetupUser)                { $User        = $env:PrinterSetupUser }
-if ($env:PrinterSetupWait)                { $WaitSeconds = [int]$env:PrinterSetupWait }
+if ($env:PrinterSetupUser)                 { $User        = $env:PrinterSetupUser }
+if ($env:PrinterSetupWait)                 { $WaitSeconds = [int]$env:PrinterSetupWait }
 
-# Read mode: print the newest stored result and stop. Safe to run repeatedly, and the
-# way to collect the answer after a deferred run. Also clears anything left behind.
+# Read mode: print the newest stored result and stop. Needs no queue, so it runs
+# BEFORE the guard below. Safe to repeat, and it clears anything left behind.
 if ($env:PrinterSetupRead) {
     $logs = @(Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' -ErrorAction SilentlyContinue |
                   Sort-Object LastWriteTime)
@@ -70,9 +67,61 @@ if ($env:PrinterSetupRead) {
     return
 }
 
+# =====================================================================
+#  HARD STOP. Nothing is added until a queue is supplied.
+# =====================================================================
+if (-not $env:PrinterSetupPath) {
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host '#  STOPPED - NO PRINTER WAS ADDED. NOTHING WAS CHANGED.    #' -ForegroundColor Red
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  This script has no printer name built in, so it needs one.' -ForegroundColor Yellow
+    Write-Host '  $env:PrinterSetupPath is not set.' -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  Copy this line, replace the placeholders, and put it BEFORE' -ForegroundColor White
+    Write-Host '  the command (same console, one line each):' -ForegroundColor White
+    Write-Host ''
+    Write-Host "      `$env:PrinterSetupPath = '\\PRINT-SERVER\QUEUE-NAME'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Example, queue name with spaces included in the quotes:' -ForegroundColor White
+    Write-Host "      `$env:PrinterSetupPath = '\\PRINTSERVER\FINANCE HP4525'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Then run the same command again. Optional extras, same' -ForegroundColor White
+    Write-Host '  pattern, each on its own line:' -ForegroundColor White
+    Write-Host "      `$env:PrinterSetupDefault  = 'false'   # don't set it default" -ForegroundColor DarkGray
+    Write-Host "      `$env:PrinterSetupElevated = 'true'    # only if the driver is missing" -ForegroundColor DarkGray
+    Write-Host "      `$env:PrinterSetupUser     = 'DOMAIN\name'  # pick the user yourself" -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host '  Tip: print the queue name on the server with' -ForegroundColor White
+    Write-Host '      Get-Printer -ComputerName PRINT-SERVER | Select-Object Name' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    return
+}
+
+$PrinterPath = ([string]$env:PrinterSetupPath).TrimEnd('\')
+if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host '#  STOPPED - the queue name is not in the right form.       #' -ForegroundColor Red
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    Write-Host ('  Got      : {0}' -f $PrinterPath) -ForegroundColor Yellow
+    Write-Host '  Expected : \\SERVER\QUEUE   (two backslashes, one separator)' -ForegroundColor White
+    Write-Host '             forward slashes are not accepted' -ForegroundColor White
+    Write-Host ''
+    Write-Host "      `$env:PrinterSetupPath = '\\PRINT-SERVER\QUEUE-NAME'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    return
+}
+
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.4.0'
+$scriptVersion = '1.5.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 

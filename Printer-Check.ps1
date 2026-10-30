@@ -29,15 +29,14 @@
     ================================================================
 #>
 
-# =========================== CONFIG ============================
-$PrinterPath = '\\IBNPS01\Reception Printer'   # <-- queue to look for ('' = just list)
+# =====================================================================
+#  SETTINGS - taken from ENVIRONMENT VARIABLES ONLY.
+#  There is no printer name anywhere in this file, on purpose: nothing
+#  here is specific to one site, and nothing has to be edited.
+# =====================================================================
 $User        = ''                               # blank = whoever is logged on
-$WaitSeconds = 25                               # needs #timeout when run in the Commands tab
-# ===============================================================
+$WaitSeconds = 25                               # needs #timeout in the Commands tab
 
-# Optional overrides for the one-liner form:
-#   $env:PrinterCheckPath = '\\server\queue' ; $env:PrinterCheckUser = 'DOMAIN\name'
-if ($env:PrinterCheckPath) { $PrinterPath = $env:PrinterCheckPath }
 if ($env:PrinterCheckUser) { $User        = $env:PrinterCheckUser }
 if ($env:PrinterCheckWait) { $WaitSeconds = [int]$env:PrinterCheckWait }
 
@@ -56,9 +55,60 @@ if ($env:PrinterCheckRead) {
     return
 }
 
+# =====================================================================
+#  HARD STOP. This script will not run without a queue to look for.
+#  Assigning $null or '' to an env var DELETES it in PowerShell, so the
+#  word 'list' is the supported way to say "no queue, just show me the
+#  printers".
+# =====================================================================
+if ($null -eq $env:PrinterCheckPath) {
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host '#  STOPPED - NOTHING WAS CHECKED. NOTHING WAS CHANGED.     #' -ForegroundColor Red
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  This script has no printer name built in, so it needs one.' -ForegroundColor Yellow
+    Write-Host '  $env:PrinterCheckPath is not set.' -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  Copy this line, replace the placeholders, and put it BEFORE' -ForegroundColor White
+    Write-Host '  the command (same console, one line each):' -ForegroundColor White
+    Write-Host ''
+    Write-Host "      `$env:PrinterCheckPath = '\\PRINT-SERVER\QUEUE-NAME'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Example:' -ForegroundColor White
+    Write-Host "      `$env:PrinterCheckPath = '\\PRINTSERVER\FINANCE-HP4525'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  To list every printer without checking a specific queue:' -ForegroundColor White
+    Write-Host "      `$env:PrinterCheckPath = 'list'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Then run the same command again.' -ForegroundColor White
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    return
+}
+
+$PrinterPath = [string]$env:PrinterCheckPath
+if ($PrinterPath -eq 'list') { $PrinterPath = '' }
+elseif ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host '#  STOPPED - the queue name is not in the right form.       #' -ForegroundColor Red
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    Write-Host ('  Got      : {0}' -f $PrinterPath) -ForegroundColor Yellow
+    Write-Host '  Expected : \\SERVER\QUEUE   (two backslashes, one separator)' -ForegroundColor White
+    Write-Host ''
+    Write-Host "      `$env:PrinterCheckPath = '\\PRINT-SERVER\QUEUE-NAME'" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '############################################################' -ForegroundColor Red
+    Write-Host ''
+    return
+}
+
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.2.0'
+$scriptVersion = '1.3.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 

@@ -40,7 +40,7 @@ paste the modifiers on their own lines first, then the command:
 ```
 #!ps
 #timeout=600000
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer' -Verify
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify
 ```
 
 If a run was killed, clean up after it:
@@ -61,7 +61,7 @@ reads the file, so the bypass has to come from whatever launches the script. Pas
 the command line:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer' -SetDefault
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Reset-OneDriveLink-2.ps1 -Account All
 ```
 
@@ -70,7 +70,7 @@ call the scripts directly:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer'
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME'
 ```
 
 Notes:
@@ -115,28 +115,28 @@ SYSTEM shell would otherwise create it for the SYSTEM profile and nobody would s
 
 ```powershell
 # add (the common case)
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525'
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME'
 
 # add and make it the default
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 
 # queue name with spaces — quote it
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer' -SetDefault
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -SetDefault
 
 # driver not installed / Point-and-Print blocked
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Elevated
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Elevated
 
 # remove
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Remove
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Remove
 
 # did it work? (read-only, no changes)
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Verify
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify
 
 # several users logged on — pick one
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -User 'IBN\gnorfor'
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -User 'CONTOSO\jsmith'
 
 # short timeout when you know it should be instant
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Verify -TimeoutSeconds 60
+.\Add-PrinterAsUser.ps1 -PrinterPath '\\PRINTSERVER\QUEUE-NAME' -Verify -TimeoutSeconds 60
 ```
 
 ### Exit codes
@@ -158,7 +158,7 @@ unblock first.
 Edit only the config block at the top:
 
 ```powershell
-$PrinterPath = '\\IBNPS01\Reception printer'   # \\server\printer
+$PrinterPath = '\\PRINTSERVER\QUEUE-NAME'   # \\server\printer
 $SetDefault  = $true                            # make it the user's default
 $Elevated    = $false                           # $true only if the driver won't install
 $User        = ''                               # blank = whoever is logged on
@@ -185,35 +185,35 @@ No parameters, no switches. The four config variables are the whole interface.
 Lists what the logged-on user actually has. Changes nothing, registers no work task.
 
 ```powershell
-$PrinterPath = '\\IBNPS01\Reception Printer'   # queue to look for ('' = just list)
+$PrinterPath = '\\PRINTSERVER\QUEUE-NAME'   # queue to look for ('' = just list)
 $User        = ''                               # blank = whoever is logged on
 ```
 
 Output:
 
 ```
-Identity : IBN\gnorfor
-Machine  : IBN00328-PERTH
+Identity : CONTOSO\jsmith
+Machine  : WORKSTATION-01
 
 Printers visible to this user (4):
-  [DEFAULT] \\IBNPS01\Reception Printer
-            driver: HP LaserJet 4525 PCL6 | port: \\IBNPS01\HP4525_FIN
+  [DEFAULT] \\PRINTSERVER\QUEUE-NAME
+            driver: Generic Printer Driver | port: \\PRINTSERVER\QUEUE-PORT
   [       ] Microsoft Print to PDF
             ...
 
 Per-user connections in HKCU (2):
-  \\IBNPS01\Reception Printer
-  \\IBNPS01\Second Floor
+  \\PRINTSERVER\QUEUE-NAME
+  \\PRINTSERVER\SECOND-QUEUE
 
 Note: built-in, not real printers:
   Microsoft Print to PDF
 
-Checking : \\IBNPS01\Reception Printer
+Checking : \\PRINTSERVER\QUEUE-NAME
   in user printer list : True
   HKCU connection key  : True
-  key path             : HKCU:\Printers\Connections\,,IBNPS01,Reception Printer
+  key path             : HKCU:\Printers\Connections\,,PRINTSERVER,QUEUE-NAME
   is default           : True
-  driver / port        : HP LaserJet 4525 PCL6 / \\IBNPS01\HP4525_FIN
+  driver / port        : Generic Printer Driver / \\PRINTSERVER\QUEUE-PORT
 VERDICT: PRESENT
 ```
 
@@ -261,7 +261,7 @@ Unlinks and re-links OneDrive for the logged-on user. Local files are never dele
 .\Reset-OneDriveLink-2.ps1 -Account All -NoRestart
 
 # specific user when several are logged on
-.\Reset-OneDriveLink-2.ps1 -Account All -User 'IBN\gnorfor'
+.\Reset-OneDriveLink-2.ps1 -Account All -User 'CONTOSO\jsmith'
 ```
 
 ---
@@ -288,7 +288,7 @@ Get-Process explorer -IncludeUserName |
     Select-Object -ExpandProperty UserName -Unique
 
 # list queue names on a print server, to copy into -PrinterPath
-Get-Printer -ComputerName print01 | Select-Object Name, DriverName, PortName
+Get-Printer -ComputerName PRINTSERVER | Select-Object Name, DriverName, PortName
 
 # the user's own printer list, from inside a user session
 Get-Printer | Format-Table Name, DriverName, PortName, Type
@@ -304,3 +304,42 @@ Get-Printer | Format-Table Name, DriverName, PortName, Type
 - **Don't close the tab mid-run.** The task keeps running but the cleanup is skipped; unregister it by name.
 - **`-User` matters on RDP-heavy boxes.** Auto-detect refuses to guess when several users have a session.
 - **Registry backups (OneDrive)** land in `%LOCALAPPDATA%\OneDriveRelink\*.reg`; revert with `reg import <file>`.
+
+## 0b. Required environment variables (paste-ready scripts)
+
+`Printer-Setup-Paste.ps1` and `Printer-Check.ps1` contain **no printer name at all**.
+They refuse to run until an environment variable supplies one, and print a boxed
+`STOPPED - NOTHING WAS CHANGED` message telling you exactly what to type. This is
+deliberate: the same script works at any site, nothing needs editing, and a missing
+value fails loudly instead of adding the wrong printer.
+
+Set it on its own line **before** the command, in the same console:
+
+```powershell
+$env:PrinterSetupPath = '\\PRINT-SERVER\QUEUE-NAME'
+```
+
+| Variable | Script | Meaning |
+|---|---|---|
+| `PrinterSetupPath` | setup | **required**; `\\server\queue` |
+| `PrinterSetupDefault` | setup | `'false'` to not set it as default |
+| `PrinterSetupElevated` | setup | `'true'` only if the driver won't install |
+| `PrinterSetupUser` | setup | `DOMAIN\name` to pick the user yourself |
+| `PrinterSetupRead` | setup | `'true'`: print the last result and stop |
+| `PrinterCheckPath` | check | **required**; `\\server\queue`, or `list` |
+| `PrinterCheckUser` | check | `DOMAIN\name` to pick the user yourself |
+| `PrinterCheckRead` | check | `'true'`: print the last result and stop |
+
+`list` is the supported way to say "no specific queue" — assigning `''` or `$null`
+to an env var *deletes* it in PowerShell, so it cannot express that.
+
+In the ScreenConnect Commands tab, the hashbang modifiers must be **contiguous on the
+first lines** — a blank line between them and only `#!ps` is applied, leaving the
+10-second kill in place:
+
+```
+#!ps
+#timeout=600000
+$env:PrinterCheckPath = '\\PRINT-SERVER\QUEUE-NAME'
+irm <gist url> | iex
+```
