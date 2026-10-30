@@ -36,15 +36,21 @@ bridge; SYSTEM is only the launcher.
 
 ## Quick start
 
+Use the `.cmd` launcher next to each script — it applies
+`-ExecutionPolicy Bypass` for you, so there is no `Set-ExecutionPolicy` step:
+
+```bat
+Add-PrinterAsUser.cmd -PrinterPath '\\print01\FIN-HP4525' -SetDefault
+Add-PrinterAsUser.cmd -PrinterPath '\\print01\FIN-HP4525' -Verify
+Reset-OneDriveLink.cmd -Account All
+```
+
+Or call the `.ps1` directly with the bypass explicit (a script cannot exempt itself —
+the policy is applied before the file is read):
+
 ```powershell
-# From Backstage / Commands tab, after uploading the script anywhere readable
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -SetDefault
-
-# did it work? (read-only)
-.\Add-PrinterAsUser.ps1 -PrinterPath '\\print01\FIN-HP4525' -Verify
-
-# OneDrive
-.\Reset-OneDriveLink-2.ps1 -Account All
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 `
+    -PrinterPath '\\print01\FIN-HP4525' -SetDefault
 ```
 
 Both refuse to run rather than degrading to SYSTEM: the payload throws if it finds

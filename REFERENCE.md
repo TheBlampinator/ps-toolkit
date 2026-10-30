@@ -8,6 +8,44 @@ uploaded them, typically `C:\ProgramData\PrinterToolkit` after the first run.
 
 ---
 
+## 0. Running it — no `Set-ExecutionPolicy` step needed
+
+A `.ps1` **cannot** exempt itself: PowerShell checks the execution policy before it
+reads the file, so the restriction is applied by whatever launches the script. Use the
+`.cmd` launcher next to each script, which passes `-ExecutionPolicy Bypass` on the
+command line and forwards your arguments and exit code:
+
+```bat
+Add-PrinterAsUser.cmd -PrinterPath '\\IBNPS01\Reception printer' -SetDefault
+Reset-OneDriveLink.cmd  -Account All
+```
+
+Equivalent one-liner if you'd rather not use the launcher:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Add-PrinterAsUser.ps1 -PrinterPath '\\IBNPS01\Reception printer'
+```
+
+Or set it for the current window only, as before (resets when the window closes):
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Notes:
+
+- **The user-session half never needs any of this.** The scheduled task already invokes
+  the staged copy with `-ExecutionPolicy Bypass`.
+- **GPO-enforced policy wins.** If `Get-ExecutionPolicy -List` shows
+  `MachinePolicy` or `UserPolicy` set, the `-ExecutionPolicy` parameter is ignored and
+  the `.cmd` won't help — that's a policy change, not a script change.
+- **A file downloaded from a browser or Teams** carries a Mark-of-the-Web and is
+  blocked even under `Bypass` on some builds. Clear it once with:
+  `Unblock-File .\Add-PrinterAsUser.ps1`
+- **AppLocker/WDAC** blocks are a separate control; nothing here bypasses them.
+
+---
+
 ## 1. Add-PrinterAsUser.ps1
 
 Adds / removes / verifies a network printer connection **for the logged-on user**.
