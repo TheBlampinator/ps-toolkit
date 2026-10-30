@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.9.0'
+$scriptVersion = '2.0.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -222,6 +222,24 @@ try {
             }
         }
 
+        # Route 2b: Add-Printer -ConnectionName. Survives on builds where
+        # Add-PrinterConnection has been removed (Windows 11 24H2+ dropped it while
+        # keeping the rest of the PrintManagement module).
+        if (-not $added) {
+            if (Get-Command Add-Printer -ErrorAction SilentlyContinue) {
+                try {
+                    $apSw = [System.Diagnostics.Stopwatch]::StartNew()
+                    Add-Printer -ConnectionName $PrinterPath -ErrorAction Stop
+                    $apSw.Stop()
+                    Write-Log ('Add-Printer -ConnectionName completed after {0:N1}s' -f $apSw.Elapsed.TotalSeconds)
+                    $added = $true
+                }
+                catch {
+                    Write-Log ('Add-Printer -ConnectionName failed: {0}' -f $_.Exception.Message)
+                }
+            }
+        }
+
         # Third route: WScript.Network COM. No WMI and no PrintManagement module - it
         # calls the same Win32 print API the Add Printer wizard uses, throws on failure,
         # and exists on every Windows back to XP. This machine has neither the cmdlet nor
@@ -267,7 +285,7 @@ try {
     Write-Log ('After - visible to user: {0}' -f [bool]$visible)
 
     if (-not $present -or -not $visible) {
-        throw ('{0} is not on the printer list. If the driver is missing and non-admin install is blocked, set Elevated to true and paste again.' -f $PrinterPath)
+        throw ('{0} is not on the printer list. If a driver consent dialog was cancelled (0x800704C7), the printer''s driver is not installed and Windows asked for permission - sign in at the machine and click Install, or have the driver pre-installed. Otherwise set Elevated to true and paste again.' -f $PrinterPath)
     }
 
     if ($SetDefault) {
