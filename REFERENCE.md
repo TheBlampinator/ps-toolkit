@@ -12,6 +12,7 @@ staged copies the scheduled task executes, not something you place there by hand
 
 | I want to… | Read |
 |---|---|
+| Do everything from a menu: pick a job, answer questions | [§1d](#1d-start-pstoolkitps1--interactive-menu) |
 | Add a printer for the person who is logged in | [§1b](#1b-printer-setup-pasteps1--no-upload-just-paste) paste-and-go, or [§1](#1-add-printerasuserps1) from a saved file |
 | Know whether a printer is already there / what they have | [§1c](#1c-printer-checkps1--read-only-paste-and-go) |
 | Fix OneDrive that will not sign in or sync | [§2](#2-reset-onedrivelink-2ps1) |
@@ -299,6 +300,33 @@ there but won't print". Remove and re-add in that case.
 Bridging note: when run from a SYSTEM shell the probe's console output cannot be read
 back, so it writes to `%TEMP%\PrinterCheck-<stamp>.txt` in the user's profile and the
 outer script reads that file, prints it, then deletes it.
+
+---
+
+## 1d. Start-PSToolkit.ps1 — interactive menu
+
+One paste, then questions. It drives the other tools and contains none of their logic, so
+fixing a tool updates the menu too.
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/39d91a30025845e326434dc2f0c6199610514fa0/Start-PSToolkit.ps1 | iex
+```
+
+Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` exit. After each job it
+asks whether to do something else. Prompts are asked with `Read-Host`.
+
+| Variable | Meaning |
+|---|---|
+| `PSToolkitDryRun` | `1` prints what would run and changes nothing — use it to rehearse |
+
+**No console to prompt in?** The first `Read-Host` that cannot get input sets an internal
+flag and the script prints the manual four-line command for every job instead of hanging.
+That is what happens in a Commands tab that does not accept typed input.
+
+The tool URLs are pinned in `$Urls` at the top; republishing a tool means updating one
+line there.
 
 ---
 

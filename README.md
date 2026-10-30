@@ -12,6 +12,7 @@ You run one command from your remote-support tool. The script does the rest.
 
 | If you want to… | Use this | Page |
 |---|---|---|
+| **Do all of the above from one menu** | `Start-PSToolkit.ps1` | [one paste, then answer questions](#one-paste-then-answer-questions-the-easiest-way) |
 | Add a printer for the person who is logged in | `Printer-Setup-Paste.ps1` | [step-by-step](#add-a-printer-the-whole-procedure) |
 | Check which printers they have, and whether one is missing | `Printer-Check.ps1` | [step-by-step](#check-what-printers-they-have) |
 | Fix OneDrive that will not sync / sign in | `Reset-OneDriveLink-2.ps1` | [step-by-step](#fix-onedrive) |
@@ -31,6 +32,43 @@ You need two things:
    give it to you, or you can list them (see [Check what printers they have](#check-what-printers-they-have)).
 2. **The person logged in to the PC** — the script works on whoever is logged on, so do
    not run it while nobody is signed in.
+
+---
+
+## One paste, then answer questions (the easiest way)
+
+Paste these three lines and the script asks you what you want to do:
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/39d91a30025845e326434dc2f0c6199610514fa0/Start-PSToolkit.ps1 | iex
+```
+
+```
+------------------------------------------------------------
+  What do you want to do?
+------------------------------------------------------------
+    1   Add a printer
+    2   Check which printers they have  (read-only)
+    3   Fix OneDrive
+    4   Exit
+
+  Choose 1-4:
+```
+
+Type `1` and it asks only the questions that job needs — the printer address, whether to
+make it their default, whether a previous attempt said "Access is denied". You never type
+a variable name and you never edit a file. Then it asks "do something else?" so one paste
+can cover a whole ticket.
+
+Two things worth knowing:
+
+- **It needs somewhere to ask questions.** In Backstage or a normal PowerShell window that
+  is fine. If your Commands tab cannot accept typed input, it prints the ready-made
+  command for each job instead of waiting forever on a prompt.
+- **It downloads the individual tool for the job you pick**, so it runs exactly the same
+  tested code as the four-line commands further down this page. Nothing is duplicated.
 
 ---
 
