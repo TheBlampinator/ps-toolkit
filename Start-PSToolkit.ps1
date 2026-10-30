@@ -37,7 +37,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.0.0'
+$version = '1.1.0'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
@@ -187,6 +187,36 @@ function Run-ToolText {
     else { & $block }
 }
 
+
+# Print the newest log a job wrote, so the outcome is visible without a follow-up
+# command. Runs as SYSTEM and reads across every profile, which is what makes it
+# useful - the log itself belongs to the user.
+function Show-LatestLog {
+    param([string]$Subfolder, [string]$Filter, [string]$SuccessPattern, [string]$Label)
+    $logs = @(Get-ChildItem "C:\Users\*\AppData\Local\$Subfolder\$Filter" -ErrorAction SilentlyContinue |
+                  Sort-Object LastWriteTime)
+    if (-not $logs.Count) {
+        Line '  No log found - the job may not have reached the user session.'
+        return
+    }
+    $f = $logs[-1]
+    Line ''
+    Line ('  {0}  ({1})' -f $f.FullName, $f.LastWriteTime.ToString('HH:mm:ss'))
+    Line ''
+    Get-Content -LiteralPath $f.FullName -Tail 25 | ForEach-Object { Line "    $_" }
+    Line ''
+    $raw = Get-Content -LiteralPath $f.FullName -Raw
+    if ($SuccessPattern -and $raw -match $SuccessPattern) {
+        Line ('  VERDICT: {0} - it worked.' -f $Label) -ForegroundColor Green
+    }
+    elseif ($raw -match 'FAILED|not connected|ERROR|Access is denied|cannot') {
+        Line '  VERDICT: FAILED - the reason is in the lines above.' -ForegroundColor Red
+    }
+    else {
+        Line '  VERDICT: still running, or it stopped without reporting.' -ForegroundColor Yellow
+    }
+}
+
 # ---- the jobs --------------------------------------------------------------
 function Job-AddPrinter {
     Head 'ADD A PRINTER FOR THE PERSON WHO IS LOGGED IN'
@@ -219,6 +249,11 @@ function Job-AddPrinter {
     if ($elevated)       { Say '  (using admin rights, because the driver is missing)' }
     Line ''
     Run-ToolText -Text $text
+
+    if (-not $DryRun) {
+        $show = AskYN -Prompt 'Show the latest setup log now?' -Default $true
+        if ($show) { Show-LatestLog -Subfolder 'PrinterToolkit' -Filter 'Setup-*.log' -SuccessPattern 'CONNECTED OK' -Label 'PRESENT' }
+    }
 }
 
 function Job-CheckPrinters {
@@ -275,6 +310,11 @@ function Job-OneDrive {
     Reset-Env
     Line ''
     Run-ToolText -Text $text -Account $account -NoRestart:(-not $restart)
+
+    if (-not $DryRun) {
+        $show = AskYN -Prompt 'Show the latest OneDrive log now?' -Default $true
+        if ($show) { Show-LatestLog -Subfolder 'OneDriveRelink' -Filter 'Relink-*.log' -SuccessPattern 'Completed successfully' -Label 'RE-LINKED' }
+    }
 }
 
 # ---- fallback when there is no console to ask in ---------------------------
