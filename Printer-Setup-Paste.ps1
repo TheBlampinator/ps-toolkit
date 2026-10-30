@@ -7,30 +7,21 @@
       PRINTER SETUP - paste the whole thing into PowerShell
     ================================================================
 
-      The three lines above are ScreenConnect "hashbang" modifiers.
-      They matter if you paste this into the Commands tab (the web
-      PowerShell box), which otherwise kills any command after 10
-      SECONDS and truncates output at 10,000 characters:
+      IMPORTANT - the ScreenConnect Commands tab kills a command after
+      10 SECONDS, and some builds ignore #timeout. This script therefore
+      never waits longer than ~4s. If the work has not finished by then
+      it prints how to read the result a few seconds later. Nothing is
+      lost: the user-session payload writes a log and keeps going.
 
-        #!ps              send this to PowerShell instead of cmd
-        #timeout=600000   10 minutes instead of 10 seconds
-        #maxlength=...    full log instead of a truncated stub
+      The three lines at the top are ScreenConnect hashbang modifiers.
+      #!ps works everywhere; #timeout is ignored by some builds, which
+      is why the script tolerates being killed.
 
-      In Backstage or a normal PowerShell window they are just
-      comments '#...' and are ignored, so nothing breaks there.
+      Works pasted into the Commands tab, Backstage, or a user window.
 
-      Works in a ScreenConnect Backstage / Commands tab shell (SYSTEM)
-      and also in a normal user PowerShell window.
-
-      EDIT ONLY THE FOUR LINES IN THE CONFIG BLOCK BELOW, then paste
-      the entire file into the PowerShell window and press Enter.
-
+      EDIT ONLY THE CONFIG BLOCK BELOW, then paste the entire file.
       No file upload, no execution policy change: commands pasted into
-      an interactive PowerShell session are not subject to the policy.
-
-      What it does, in plain terms: gets the printer connected in the
-      logged-on user's own session, so it actually appears in their
-      printer list. Adds nothing to SYSTEM's profile.
+      an interactive session are not subject to the policy.
     ================================================================
 #>
 
@@ -39,6 +30,7 @@ $PrinterPath = '\\IBNPS01\Reception Printer'   # <-- CHANGE THIS: \\server\print
 $SetDefault  = $true                            # make it the user's default printer
 $Elevated    = $false                           # $true only if the driver won't install
 $User        = ''                               # blank = whoever is logged on
+$WaitSeconds = 4                                # how long to wait before deferring
 # ===============================================================
 
 # Optional overrides, so the one-liner form can be reused without editing anything:
@@ -46,14 +38,41 @@ $User        = ''                               # blank = whoever is logged on
 #   $env:PrinterSetupElevated = 'true'
 #   $env:PrinterSetupDefault  = 'false'
 #   $env:PrinterSetupUser     = 'DOMAIN\name'
-if ($env:PrinterSetupPath)               { $PrinterPath = $env:PrinterSetupPath }
-if ($env:PrinterSetupElevated -eq 'true') { $Elevated   = $true }
-if ($env:PrinterSetupDefault -eq 'false') { $SetDefault = $false }
-if ($env:PrinterSetupUser)               { $User       = $env:PrinterSetupUser }
+if ($env:PrinterSetupPath)                { $PrinterPath = $env:PrinterSetupPath }
+if ($env:PrinterSetupElevated -eq 'true')  { $Elevated    = $true }
+if ($env:PrinterSetupDefault -eq 'false')  { $SetDefault  = $false }
+if ($env:PrinterSetupUser)                { $User        = $env:PrinterSetupUser }
+if ($env:PrinterSetupWait)                { $WaitSeconds = [int]$env:PrinterSetupWait }
+
+# Read mode: print the newest stored result and stop. Safe to run repeatedly, and the
+# way to collect the answer after a deferred run. Also clears anything left behind.
+if ($env:PrinterSetupRead) {
+    $logs = @(Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' -ErrorAction SilentlyContinue |
+                  Sort-Object LastWriteTime)
+    if ($logs.Count) {
+        $f = $logs[-1]
+        Write-Host ('Result from {0:HH:mm:ss}  ({1})' -f $f.LastWriteTime, $f.FullName)
+        Get-Content -LiteralPath $f.FullName | ForEach-Object { Write-Host '  ' $_ }
+        $raw = Get-Content -LiteralPath $f.FullName -Raw
+        Write-Host ''
+        if ($raw -match 'CONNECTED OK') { Write-Host 'VERDICT: PRESENT' }
+        elseif ($raw -match 'FAILED:')   { Write-Host 'VERDICT: FAILED - see the message above' }
+        else                             { Write-Host 'VERDICT: still running or incomplete' }
+    }
+    else {
+        Write-Host 'No stored result yet - the work may still be starting, or it never ran.'
+    }
+    Get-ScheduledTask -TaskName 'PrinterSetup-*' -ErrorAction SilentlyContinue |
+        Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
+    Get-ChildItem 'C:\ProgramData\PrinterToolkit' -Filter 'PrinterSetup-*.ps1' -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-2) } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    return
+}
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '1.3.0'
+$scriptVersion = '1.4.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -61,8 +80,8 @@ function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'H
 # in the Commands tab, whatever you pasted was not this script.
 Say ('Printer-Setup-Paste v{0} starting on {1}' -f $scriptVersion, $env:COMPUTERNAME)
 
-# The work that has to happen inside the user's session. Kept as literal text so it
-# can be dropped to a file and run under the user's token (or run right here).
+# The work that has to happen inside the user's session. Kept as literal text so it can
+# be written to a file and run under the user's token (or run right here).
 $PayloadText = @'
 [CmdletBinding()]
 param(
@@ -81,92 +100,99 @@ function Write-Log {
     Write-Output $line
 }
 
-$ident = [Security.Principal.WindowsIdentity]::GetCurrent()
-if ($ident.IsSystem) { throw 'Refusing to run as SYSTEM - the printer would be added for SYSTEM, not the user.' }
+try {
+    $ident = [Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($ident.IsSystem) { throw 'Refusing to run as SYSTEM - the printer would be added for SYSTEM, not the user.' }
 
-Write-Log ('Printer setup for {0}\{1} on {2}' -f $env:USERDOMAIN, $env:USERNAME, $env:COMPUTERNAME)
-Write-Log ('Identity: {0}' -f $ident.Name)
-Write-Log ('Queue:    {0}' -f $PrinterPath)
+    Write-Log ('Printer setup for {0}\{1} on {2}' -f $env:USERDOMAIN, $env:USERNAME, $env:COMPUTERNAME)
+    Write-Log ('Identity: {0}' -f $ident.Name)
+    Write-Log ('Queue:    {0}' -f $PrinterPath)
 
-$parts = $PrinterPath.TrimEnd('\').TrimStart('\').Split('\')
-$connPath = 'HKCU:\Printers\Connections\,,' + ($parts -join ',')
+    $parts = $PrinterPath.TrimEnd('\').TrimStart('\').Split('\')
+    $connPath = 'HKCU:\Printers\Connections\,,' + ($parts -join ',')
+    Write-Log ('Registry key: {0}' -f $connPath)
+    Write-Log ('Before - key present: {0}' -f (Test-Path -LiteralPath $connPath))
 
-Write-Log ('Registry key: {0}' -f $connPath)
-Write-Log ('Before - key present: {0}' -f (Test-Path -LiteralPath $connPath))
+    $existing = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterPath })
+    Write-Log ('Before - visible to user: {0}' -f [bool]$existing)
 
-$existing = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterPath })
-Write-Log ('Before - visible to user: {0}' -f [bool]$existing)
+    if (-not $existing) {
+        $added = $false
+        if (Get-Command Add-PrinterConnection -ErrorAction SilentlyContinue) {
+            try {
+                Add-PrinterConnection -ConnectionName $PrinterPath -ErrorAction Stop
+                $added = $true
+                Write-Log 'Add-PrinterConnection succeeded.'
+            }
+            catch {
+                Write-Log ('Add-PrinterConnection failed: {0}' -f $_.Exception.Message)
+                Write-Log 'Trying printui.dll instead.'
+            }
+        }
+        if (-not $added) {
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+                    -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
+            Write-Log ('printui /in exit code: {0}' -f $p.ExitCode)
+        }
+        Start-Sleep -Seconds 2
+    }
+    else {
+        Write-Log 'Already connected for this user - not adding again.'
+    }
 
-if (-not $existing) {
-    $added = $false
-    if (Get-Command Add-PrinterConnection -ErrorAction SilentlyContinue) {
+    # Read back. This is what makes the verdict trustworthy.
+    $present = Test-Path -LiteralPath $connPath
+    $visible = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterPath })
+    Write-Log ('After - key present: {0}' -f $present)
+    Write-Log ('After - visible to user: {0}' -f [bool]$visible)
+
+    if (-not $present -or -not $visible) {
+        throw ('{0} is not on the printer list. If the driver is missing and non-admin install is blocked, set Elevated to true and paste again.' -f $PrinterPath)
+    }
+
+    if ($SetDefault) {
+        $target = $visible | Select-Object -First 1
         try {
-            Add-PrinterConnection -ConnectionName $PrinterPath -ErrorAction Stop
-            $added = $true
-            Write-Log 'Add-PrinterConnection succeeded.'
+            Invoke-CimMethod -InputObject $target -MethodName SetDefaultPrinter -ErrorAction Stop | Out-Null
+            Write-Log 'SetDefaultPrinter invoked.'
         }
         catch {
-            Write-Log ('Add-PrinterConnection failed: {0}' -f $_.Exception.Message)
-            Write-Log 'Trying printui.dll instead.'
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+                    -ArgumentList ('printui.dll,PrintUIEntry /y /q /n "{0}"' -f $PrinterPath)
+            Write-Log ('printui /y exit code: {0}' -f $p.ExitCode)
+        }
+        $def = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Default }) | Select-Object -First 1
+        if ($def) { Write-Log ('Default printer: {0}' -f $def.Name) }
+        if (-not $def -or $def.Name -ne $PrinterPath) {
+            throw ('Could not confirm {0} as the default printer.' -f $PrinterPath)
         }
     }
-    if (-not $added) {
-        $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
-                -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
-        Write-Log ('printui /in exit code: {0}' -f $p.ExitCode)
+
+    Write-Log 'Printers for this user now:'
+    Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {
+        Write-Log ('  {0}{1}  [{2}]' -f $_.Name, $(if ($_.Default) { ' (default)' } else { '' }), $_.PortName)
     }
-    Start-Sleep -Seconds 2
-}
-else {
-    Write-Log 'Already connected for this user - not adding again.'
-}
 
-# Read back. This is what makes the exit code trustworthy.
-$present = Test-Path -LiteralPath $connPath
-$visible = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterPath })
-Write-Log ('After - key present: {0}' -f $present)
-Write-Log ('After - visible to user: {0}' -f [bool]$visible)
-
-if (-not $present -or -not $visible) {
-    throw ('NOT CONNECTED: {0} is not on the printer list. If the driver is missing and non-admin install is blocked, set the Elevated option to true and paste again.' -f $PrinterPath)
+    Write-Log 'CONNECTED OK'
 }
-
-if ($SetDefault) {
-    $target = $visible | Select-Object -First 1
-    try {
-        Invoke-CimMethod -InputObject $target -MethodName SetDefaultPrinter -ErrorAction Stop | Out-Null
-        Write-Log 'SetDefaultPrinter invoked.'
-    }
-    catch {
-        $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
-                -ArgumentList ('printui.dll,PrintUIEntry /y /q /n "{0}"' -f $PrinterPath)
-        Write-Log ('printui /y exit code: {0}' -f $p.ExitCode)
-    }
-    $def = @(Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Where-Object { $_.Default }) | Select-Object -First 1
-    if ($def) { Write-Log ('Default printer: {0}' -f $def.Name) }
-    if (-not $def -or $def.Name -ne $PrinterPath) {
-        throw ('Could not confirm {0} as the default printer.' -f $PrinterPath)
-    }
+catch {
+    # Always leave a terminal marker, so the outer script and read mode can tell
+    # "still working" from "gave up".
+    Write-Log ('FAILED: {0}' -f $_.Exception.Message)
+    throw
 }
-
-Write-Log 'Printers for this user now:'
-Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {
-    Write-Log ('  {0}{1}  [{2}]' -f $_.Name, $(if ($_.Default) { ' (default)' } else { '' }), $_.PortName)
-}
-
-Write-Log 'CONNECTED OK'
 '@
 
-# ---- 0. sanity-check the config -------------------------------------------------
+# ---- 0. sanity-check the config ----------------------------------------------
 $PrinterPath = $PrinterPath.TrimEnd('\')
 if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
     throw "`$PrinterPath must look like \\server\printer - you have '$PrinterPath'"
 }
 
-Say ('Queue:     {0}' -f $PrinterPath)
-Say ('Default:   {0}' -f $SetDefault)
+Say ('Queue:    {0}' -f $PrinterPath)
+Say ('Default:  {0}   Elevated: {1}' -f $SetDefault, $Elevated)
 
-# ---- 1. drop the payload somewhere every account can read it --------------------
+# ---- 1. drop the payload somewhere every account can read it ------------------
 $toolDir = 'C:\ProgramData\PrinterToolkit'
 try {
     $null = New-Item -ItemType Directory -Path $toolDir -Force
@@ -174,19 +200,20 @@ try {
     Set-Content -LiteralPath $payloadFile -Value $PayloadText -Encoding UTF8
 }
 catch {
-    $toolDir = $env:TEMP
-    $payloadFile = Join-Path $toolDir ('PrinterSetup-{0}.ps1' -f $stamp)
+    $payloadFile = Join-Path $env:TEMP ('PrinterSetup-{0}.ps1' -f $stamp)
     Set-Content -LiteralPath $payloadFile -Value $PayloadText -Encoding UTF8
 }
-Say ('Payload:   {0}' -f $payloadFile)
+Say ('Payload:  {0}' -f $payloadFile)
 
 $ok = $false
-$keepPayload = $false
+$deferred = $false
+$payloadKept = $false
+$taskName = $null
 
 try {
     $ident = [Security.Principal.WindowsIdentity]::GetCurrent()
 
-    # ---- 2. already the right user? just do the work ---------------------------
+    # ---- 2. already the right user? just do the work -------------------------
     if (-not $ident.IsSystem) {
         Say ('Running as {0} - doing the work directly.' -f $ident.Name)
         try {
@@ -198,7 +225,7 @@ try {
         }
     }
     else {
-        # ---- 3. SYSTEM: find the user and bridge into their session ------------
+        # ---- 3. SYSTEM: find the user and run the payload in their session ----
         $users = @(
             Get-Process explorer -IncludeUserName -ErrorAction SilentlyContinue |
                 Where-Object { $_.UserName -and $_.UserName -notmatch '\\(SYSTEM|LOCAL SERVICE|NETWORK SERVICE)$' } |
@@ -215,20 +242,7 @@ try {
         elseif ($users -notcontains $User) {
             throw ('{0} has no session. Logged on: {1}' -f $User, ($users -join ', '))
         }
-
         Say ('SYSTEM shell - bridging into {0}' -f $User)
-
-        # profile path by SID, because the folder name does not always match the account
-        $profileDir = $null
-        try {
-            $sid = (New-Object System.Security.Principal.NTAccount($User)).Translate(
-                        [System.Security.Principal.SecurityIdentifier]).Value
-            $profileDir = (Get-CimInstance Win32_UserProfile -Filter "SID='$sid'" -ErrorAction SilentlyContinue).LocalPath
-        }
-        catch {
-            Say 'Could not translate the account to a SID; using a name-based profile path.'
-        }
-        if (-not $profileDir) { $profileDir = 'C:\Users\' + ($User -split '\\')[-1] }
 
         $taskName = 'PrinterSetup-' + $stamp
         $argLine = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}"{2}' -f `
@@ -240,70 +254,56 @@ try {
         $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
                         -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
 
-        Say ('Task:      {0} (run level {1})' -f $taskName, $runLevel)
+        Say ('Task:     {0} (run level {1})' -f $taskName, $runLevel)
         Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal `
             -Settings $settings -Force | Out-Null
 
-        $startedAt = Get-Date
-        # LastRunTime comes back truncated to whole seconds, so allow slack - otherwise a
-        # task that finishes in 200ms never satisfies "LastRunTime -gt startedAt".
-        $notBefore = $startedAt.AddSeconds(-5)
-        $task = $null; $info = $null; $done = $false
-        $lastNote = Get-Date
+        try { Start-ScheduledTask -TaskName $taskName }
+        catch { Say ('Task start failed: {0}' -f $_.Exception.Message) }
 
-        try {
-            Start-ScheduledTask -TaskName $taskName
-            Say 'Waiting for the user session...'
+        # Wait for a terminal marker in the payload's log rather than for the task state:
+        # the log tells us whether it actually succeeded.
+        Say ('Waiting up to {0}s for the result...' -f $WaitSeconds)
+        $deadline = (Get-Date).AddSeconds($WaitSeconds)
+        $raw = $null
+        $logFile = $null
+        do {
+            Start-Sleep -Seconds 1
+            $logFile = Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' -ErrorAction SilentlyContinue |
+                           Sort-Object LastWriteTime | Select-Object -Last 1
+            if ($logFile) { $raw = Get-Content -LiteralPath $logFile.FullName -Raw -ErrorAction SilentlyContinue }
+        } while ((-not $raw -or $raw -notmatch 'CONNECTED OK|FAILED:') -and (Get-Date) -lt $deadline)
 
-            $deadline = (Get-Date).AddSeconds(180)
-            do {
-                Start-Sleep -Seconds 2
-                $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-                if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
-                $done = $task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore
-                if (-not $done -and ((Get-Date) - $lastNote).TotalSeconds -ge 30) {
-                    Say ('  still waiting - state: {0}, last result: {1}' -f `
-                            $task.State, $(if ($info) { $info.LastTaskResult } else { 'n/a' }))
-                    $lastNote = Get-Date
-                }
-            } while (-not $done -and (Get-Date) -lt $deadline)
-
-            if (-not $done) {
-                Say ("Timed out waiting. Task state: {0}. Its log may still be growing." -f $task.State)
-                $keepPayload = $true
-            }
-            elseif ($info.LastTaskResult -eq 0) {
-                Say 'Task finished, exit code 0.'
-                $ok = $true
-            }
-            else {
-                Say ('Task finished with exit code {0} (0x{0:X}).' -f $info.LastTaskResult)
-            }
-        }
-        finally {
-            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-        }
-
-        # show the user's log, wherever it actually is
-        $logDir = '{0}\AppData\Local\PrinterToolkit' -f $profileDir
-        $log = Get-ChildItem -LiteralPath $logDir -Filter 'Setup-*.log' -ErrorAction SilentlyContinue |
-                   Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        if ($log) {
-            Say ('Log: {0}' -f $log.FullName)
-            Get-Content -LiteralPath $log.FullName | ForEach-Object { Write-Host '    ' $_ }
-            if ((Get-Content -LiteralPath $log.FullName -Raw) -match 'CONNECTED OK') { $ok = $true }
+        Write-Host ''
+        if ($raw -and $raw -match 'CONNECTED OK|FAILED:') {
+            Say ('Log: {0}' -f $logFile.FullName)
+            Get-Content -LiteralPath $logFile.FullName | ForEach-Object { Write-Host '    ' $_ }
+            $ok = ($raw -match 'CONNECTED OK')
         }
         else {
-            Say ('No log at {0} - the task did not run as that user.' -f $logDir)
+            # Out of time - the Commands tab kills us at 10s. Keep the payload and the
+            # task: the task may not have started yet, and it needs the payload file.
+            $deferred = $true
+            $payloadKept = $true
+            Say 'The work is still running - this console is about to be killed.'
+            Write-Host ''
+            Write-Host 'Read the result in a few seconds with:' -ForegroundColor Yellow
+            Write-Host "  Get-Content (Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' | Sort-Object LastWriteTime | Select-Object -Last 1).FullName -Tail 25"
+            Write-Host ''
+            Write-Host 'Or, one line (same gist, read-only, also cleans up):' -ForegroundColor Yellow
+            Write-Host "  `$env:PrinterSetupRead = 'true'; irm <this gist url> | iex"
+            Write-Host ''
+            Say ('Task: {0}  (cleanup: Unregister-ScheduledTask -TaskName ''{0}'' -Confirm:$false)' -f $taskName)
         }
     }
 }
 finally {
-    if ($keepPayload) {
-        Say ('Payload kept for inspection: {0}' -f $payloadFile)
-    }
-    else {
+    # Never remove the payload while a deferred task may still be about to use it.
+    if (-not $payloadKept) {
         Remove-Item -LiteralPath $payloadFile -Force -ErrorAction SilentlyContinue
+    }
+    if (-not $deferred -and $taskName) {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
 
@@ -312,7 +312,7 @@ if ($ok) {
     Write-Host ('RESULT: CONNECTED - {0} is on the printer list.' -f $PrinterPath) -ForegroundColor Green
     if ($SetDefault) { Write-Host '        It is set as the default printer.' }
 }
-else {
+elseif (-not $deferred) {
     Write-Host 'RESULT: NOT CONNECTED - read the log above for the reason.' -ForegroundColor Red
     Write-Host '        If it mentions access denied, set $Elevated = $true and paste again.'
 }

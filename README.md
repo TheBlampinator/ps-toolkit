@@ -87,25 +87,30 @@ itself as SYSTEM, and `-Verify` checks the *user's* hive, not SYSTEM's.
 
 ## One-liners (public gists)
 
-Every script is also published as a **public gist**, so you can run one without getting
-a file onto the box. The URLs are pinned to a commit-like revision, so they keep serving
-exactly that version; after editing a script run `scripts/publish-gists.sh` and it
-updates the gists and prints fresh URLs.
+Every script is also published as a **public gist**, so you can run one without getting a
+file onto the box. These are the stable `/raw/<file>` URLs — they always serve the latest
+published version. For an immutable URL (pinned to a revision that can never change),
+run `scripts/publish-gists.sh`; it prints the pinned form and records ids in
+`scripts/gists.json`.
 
 **Paste-ready** — runs in memory, nothing lands on disk:
 
 | Script | Paste |
 |---|---|
-| `Printer-Setup-Paste.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/2cd7a1970147cd1bb87ef9a195324065b7a6e542/Printer-Setup-Paste.ps1 \| iex` |
-| `Printer-Check.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/fd65801ac4aba838c1f4e635147ce4b8e6ec83f6/Printer-Check.ps1 \| iex` |
+| `Printer-Setup-Paste.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 \| iex` |
+| `Printer-Check.ps1` | `irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 \| iex` |
 
-In the ScreenConnect **Commands tab** put the modifiers first, or the command is killed
-after 10 seconds:
+Both are built to survive the ScreenConnect Commands tab killing them at 10 seconds: they
+wait ~4 seconds, then either print the verdict or tell you how to read it. Put `#!ps` on
+the first line (already in the files) so the tab sends it to PowerShell rather than cmd.
+`#timeout` is honoured by some builds and ignored by others, so neither script depends on it.
+
+Collect a deferred result without running anything again:
 
 ```
 #!ps
-#timeout=600000
-irm https://gist.githubusercontent.com/.../Printer-Setup-Paste.ps1 | iex
+$env:PrinterSetupRead = 'true'; irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
+$env:PrinterCheckRead = 'true'; irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
 ```
 
 **File-based** — `Add-PrinterAsUser.ps1` and `Reset-OneDriveLink-2.ps1` re-invoke
@@ -113,20 +118,20 @@ themselves through a scheduled task, so they need a real file path. Two statemen
 
 ```powershell
 $f = "$env:TEMP\Add-PrinterAsUser.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/42000b8cddae47063f738a8a214ca883/raw/b2b3564c2f2153c277ba650ae7c83f57999501b3/Add-PrinterAsUser.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/42000b8cddae47063f738a8a214ca883/raw/Add-PrinterAsUser.ps1 -OutFile $f
 & $f -PrinterPath '\\print01\FIN-HP4525' -SetDefault
 ```
 
 ```powershell
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/bf58cda91c5a3316c9510c30184f58e83851daa4/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
 The endpoint needs outbound HTTPS to `gist.githubusercontent.com`. On a box behind a
 strict egress proxy these will fail — save the script locally and run it instead.
 
-`scripts/publish-gists.sh` (bash + `gh` + `jq`) recreates or updates all four from the
+`scripts/publish-gists.sh` (bash + `gh` + `jq`) creates or updates all four gists from the
 repo files and writes `scripts/gists.json` so repeat runs update instead of duplicating.
 
 ## Exit 0 means verified
