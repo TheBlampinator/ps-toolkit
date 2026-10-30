@@ -69,8 +69,13 @@ function Get-ScheduledTask {
     [pscustomobject]@{ TaskName = $TaskName; State = 'Ready' }
 }
 function Get-ScheduledTaskInfo {
+    # Real Windows truncates LastRunTime to whole seconds. Reproduce that exactly: the
+    # returned time is EARLIER than $startedAt captured microseconds later. This is the
+    # regression that made the wait loop run to its full timeout after success.
     [CmdletBinding()] param($TaskName)
-    [pscustomobject]@{ LastTaskResult = 0; LastRunTime = (Get-Date).AddSeconds(5) }
+    $now = Get-Date
+    $truncated = $now.AddTicks(-($now.Ticks % [TimeSpan]::TicksPerSecond))
+    [pscustomobject]@{ LastTaskResult = 0; LastRunTime = $truncated }
 }
 function Unregister-ScheduledTask {
     [CmdletBinding()] param($TaskName, [switch]$Confirm)
@@ -84,7 +89,8 @@ $body = $src.Substring(0, $src.LastIndexOf('# ====', $cut))
 Invoke-Expression $body
 
 Write-Host "`n================ BRIDGE RUN ================`n"
-Invoke-AsLoggedOnUser -User $null -Account 'All' -TimeoutSeconds 30
+$out = (Invoke-AsLoggedOnUser -User $null -Account 'All' -TimeoutSeconds 10 6>&1 | Out-String)
+Write-Host $out
 
 Write-Host "`n================ ASSERTIONS ================`n"
 $fail = 0
@@ -102,6 +108,8 @@ Check 'arg has -File "staged path"'        ($Rec.action.Argument -match '-File "
 Check 'task registered'                    ($null -ne $Rec.registered)
 Check 'task started'                       ($Rec.started)
 Check 'task cleaned up'                    ($Rec.unregistered)
+Check 'did not time out (LastRunTime truncation)' ($out -notmatch 'TIMED OUT')
+Check 'reported exit code 0'               ($out -match 'Task exit code 0')
 Check 'profile resolved by SID filter'     ($Rec.cimi -match "SID='S-1-5-21")
 Write-Host "`n  argument line:`n    $($Rec.action.Argument)"
 Write-Host "`n  failures: $fail"

@@ -55,8 +55,15 @@ function Register-ScheduledTask { [CmdletBinding()] param($TaskName, $Action, $P
 function Start-ScheduledTask { [CmdletBinding()] param($TaskName); $Rec.started = $true }
 function Get-ScheduledTask { [CmdletBinding()] param($TaskName)
                              [pscustomobject]@{ TaskName = $TaskName; State = 'Ready' } }
-function Get-ScheduledTaskInfo { [CmdletBinding()] param($TaskName)
-                                 [pscustomobject]@{ LastTaskResult = 0; LastRunTime = (Get-Date).AddSeconds(5) } }
+function Get-ScheduledTaskInfo {
+    # Real Windows truncates LastRunTime to whole seconds. Reproduce that exactly: the
+    # returned time is EARLIER than $startedAt captured microseconds later. This is the
+    # regression that made the wait loop run to its full timeout after success.
+    [CmdletBinding()] param($TaskName)
+    $now = Get-Date
+    $truncated = $now.AddTicks(-($now.Ticks % [TimeSpan]::TicksPerSecond))
+    [pscustomobject]@{ LastTaskResult = 0; LastRunTime = $truncated }
+}
 function Unregister-ScheduledTask { [CmdletBinding()] param($TaskName, [switch]$Confirm); $Rec.unregistered = $true }
 
 # --- load ONLY the function definitions from the real script ----------------
@@ -84,7 +91,9 @@ Check 'regex rejects subst path'   ('\\print01\q\sub' -notmatch '^\\\\[^\\]+\\[^
 Check 'TrimEnd removes trailing \' (('\\print01\FIN-HP4525\').TrimEnd('\') -eq '\\print01\FIN-HP4525')
 
 Write-Host "`n============ BRIDGE RUN ============`n"
-Invoke-AsLoggedOnUser -User $null -PrinterPath '\\print01\FIN-HP4525' -SetDefault -TimeoutSeconds 30
+# Timeout kept short so a regression in the wait condition fails fast instead of hanging.
+$out = (Invoke-AsLoggedOnUser -User $null -PrinterPath '\\print01\FIN-HP4525' -SetDefault -TimeoutSeconds 10 6>&1 | Out-String)
+Write-Host $out
 
 Write-Host "`n============ BRIDGE ASSERTIONS ============`n"
 Check 'target user auto-detected'        ($Rec.principal.UserId -eq 'CONTOSO\jsmith')
@@ -99,6 +108,8 @@ Check 'no -Remove when adding'           ($Rec.action.Argument -notmatch '-Remov
 Check 'task registered'                  ($null -ne $Rec.registered)
 Check 'task started'                     ($Rec.started)
 Check 'task cleaned up'                  ($Rec.unregistered)
+Check 'did not time out (LastRunTime truncation)' ($out -notmatch 'TIMED OUT')
+Check 'reported exit code 0'             ($out -match 'Task exit code 0')
 Check 'self staged to ProgramData'       ($Rec.copied -match 'ProgramData\\PrinterToolkit\\Add-PrinterAsUser\.ps1')
 
 Write-Host "`n  argument line:`n    $($Rec.action.Argument)"

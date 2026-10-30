@@ -365,6 +365,10 @@ function Invoke-AsLoggedOnUser {
         -Settings $settings -Force | Out-Null
 
     $startedAt = Get-Date
+    # Get-ScheduledTaskInfo truncates LastRunTime to whole seconds, so a task that
+    # finishes in under a second never satisfies 'LastRunTime -gt $startedAt' and
+    # the wait would run to the full timeout despite success. Allow slack.
+    $notBefore = $startedAt.AddSeconds(-5)
     $task = $null
     $info = $null
     $done = $false
@@ -373,11 +377,17 @@ function Invoke-AsLoggedOnUser {
         Write-Log 'Started. Waiting for the user-session run...'
 
         $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        $lastNote = Get-Date
         do {
             Start-Sleep -Seconds 2
             $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
             if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
-            $done = $task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -gt $startedAt
+            $done = $task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore
+            if (-not $done -and ((Get-Date) - $lastNote).TotalSeconds -ge 30) {
+                Write-Log ('  still waiting - state: {0}, last result: {1}' -f `
+                    $task.State, $(if ($info) { $info.LastTaskResult } else { 'n/a' }))
+                $lastNote = Get-Date
+            }
         } while (-not $done -and (Get-Date) -lt $deadline)
 
         if (-not $done) {
