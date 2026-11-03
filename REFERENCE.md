@@ -364,7 +364,28 @@ line there.
 
 ## 2. Reset-OneDriveLink-2.ps1
 
-Unlinks and re-links OneDrive for the logged-on user. Local files are never deleted.
+Unlinks and re-links OneDrive for the logged-on user, streaming progress as it goes and
+verifying the result before claiming success.
+
+**How it reports.** In SYSTEM mode it stages the payload, starts a one-shot task as the
+user, then *tails the payload's log live* — every line appears in your console as the user
+session writes it. The payload finishes with one of three markers, and the script ends with
+a matching `RESULT:` line:
+
+| Marker | Meaning | Final line |
+|---|---|---|
+| `VERIFIED-COMPLETE` | OneDrive signed back in and re-created its account key | `RESULT: VERIFIED` (green) |
+| `VERIFICATION FAILED` | not signed back in within 120 s | `RESULT: NOT VERIFIED` |
+| `VERIFICATION SKIPPED` | `-NoRestart` was used | `RESULT: UNLINKED` |
+
+Verification is a read of `HKCU:\Software\Microsoft\OneDrive\Accounts` **in the user's own
+hive** after the restart, so it can only pass if OneDrive really re-registered. A registry
+export of every removed account is kept in `%LOCALAPPDATA%\OneDriveRelink` for rollback.
+
+**It never calls `exit`.** These scripts are routinely run from text (pasted, or fetched and
+invoked in memory by the menu), and `exit` in that context terminates the host — which used
+to close the operator's console at the end of a run. A return code is set instead, and the
+`RESULT:` line is the outcome.
 
 ### Parameters
 

@@ -426,22 +426,24 @@ function Invoke-AsLoggedOnUser {
 # =============================================================================
 #  MAIN
 # =============================================================================
-$ident    = [Security.Principal.WindowsIdentity]::GetCurrent()
-$isSystem = $ident.IsSystem
-
+$script:ExitCode = 0
 try {
+    $ident    = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $isSystem = $ident.IsSystem
+
     if ($Payload -or -not $isSystem) {
         Invoke-AddPrinterWork -PrinterPath $PrinterPath -SetDefault:$SetDefault -Remove:$Remove -Verify:$Verify
-        exit 0
     }
-
-    Write-Log "SYSTEM mode on $env:COMPUTERNAME - bridging into the logged-on user session"
-    Invoke-AsLoggedOnUser -User $User -PrinterPath $PrinterPath -SetDefault:$SetDefault `
-        -Remove:$Remove -Verify:$Verify -Elevated:$Elevated -TimeoutSeconds $TimeoutSeconds
-    Write-Log 'Completed successfully.'
-    exit 0
+    else {
+        Write-Log "SYSTEM mode on $env:COMPUTERNAME - bridging into the logged-on user session"
+        Invoke-AsLoggedOnUser -User $User -PrinterPath $PrinterPath -SetDefault:$SetDefault `
+            -Remove:$Remove -Verify:$Verify -Elevated:$Elevated -TimeoutSeconds $TimeoutSeconds
+    }
 }
 catch {
     Write-Log "ERROR: $($_.Exception.Message)"
-    exit 1
+    $script:ExitCode = 1
 }
+
+# Never 'exit' - these scripts are run from text, and 'exit' closes the caller's console.
+if ($script:ExitCode -ne 0) { Write-Host 'RESULT: FAILED - see the message above.' -ForegroundColor Red }

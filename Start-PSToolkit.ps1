@@ -45,7 +45,7 @@ $version = '1.1.0'
 $Urls = [ordered]@{
     PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/7066414df24068a10dd6483986cf7ea889a8e501/Printer-Setup-Paste.ps1'
     PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/23ff3dbaedf1bb36af2b261d337164c937894fd1/Printer-Check.ps1'
-    OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
+    OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/f5a3c6d707691e3ce89c9c72123a5d78d7dfdd67/Reset-OneDriveLink-2.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.

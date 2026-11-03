@@ -91,6 +91,12 @@ $script:LogFile = $null
 $script:SelfPath = $PSCommandPath
 if (-not $script:SelfPath) { $script:SelfPath = $MyInvocation.MyCommand.Path }
 
+# The source text of whatever is running. Needed when this file was not run from disk -
+# pasted, or fetched as text and executed in memory by the menu - because the scheduled
+# task requires a real file to execute.
+$script:SelfText = $null
+try { $script:SelfText = $MyInvocation.MyCommand.ScriptBlock.ToString() } catch { }
+
 function Write-Log {
     param([string]$Message)
     $line = '{0}  {1}' -f (Get-Date -Format 's'), $Message
@@ -156,6 +162,7 @@ function Invoke-OneDriveWork {
         Stop-OneDrive
 
         $accountsKey = 'HKCU:\Software\Microsoft\OneDrive\Accounts'
+        $removed = @()
         if (-not (Test-Path -LiteralPath $accountsKey)) {
             Write-Log 'No OneDrive accounts are registered; nothing to unlink.'
         }
@@ -189,6 +196,7 @@ function Invoke-OneDriveWork {
 
                 Remove-Item $key.PSPath -Recurse -Force
                 Write-Log "  Removed account registration $name"
+                $removed += $name
 
                 $settings = Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\settings\$name"
                 if (Test-Path -LiteralPath $settings) {
@@ -199,12 +207,60 @@ function Invoke-OneDriveWork {
         }
     }
 
-    if (-not $NoRestart -and -not (Get-Process -Name OneDrive -ErrorAction SilentlyContinue)) {
+    if ($NoRestart) {
+        Write-Log 'OneDrive left stopped (-NoRestart) - nothing to verify.'
+        Write-Log 'VERIFICATION SKIPPED'
+        return
+    }
+
+    if (-not (Get-Process -Name OneDrive -ErrorAction SilentlyContinue)) {
         Write-Log 'Starting OneDrive to re-link'
         Start-Process -FilePath $exe
     }
 
-    Write-Log 'Completed successfully.'
+    if (-not $removed -or -not $removed.Count) {
+        Write-Log 'Nothing was unlinked, so there is nothing to re-register.'
+        Write-Log 'VERIFIED-COMPLETE: no change was needed.'
+        return
+    }
+
+    # ---- verification ------------------------------------------------------
+    # The only proof that the fix worked is OneDrive signing back in by itself and
+    # re-creating the account registration. Watch for it in the user's own hive.
+    $waitSeconds = 120
+    Write-Log ('Waiting up to {0}s for OneDrive to sign back in and re-register...' -f $waitSeconds)
+    $deadline = (Get-Date).AddSeconds($waitSeconds)
+    $rekey = $null
+    $lastNote = Get-Date
+    while (-not $rekey -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 3
+        if (Test-Path -LiteralPath $accountsKey) {
+            $rekey = Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue |
+                        Where-Object { $removed -contains $_.PSChildName } |
+                        Select-Object -First 1
+        }
+        if (-not $rekey -and ((Get-Date) - $lastNote).TotalSeconds -ge 15) {
+            $left = [int]($deadline - (Get-Date)).TotalSeconds
+            Write-Log ('  still waiting for sign-in - about {0}s left' -f [Math]::Max(0, $left))
+            $lastNote = Get-Date
+        }
+    }
+
+    if ($rekey) {
+        $rp = Get-ItemProperty $rekey.PSPath -ErrorAction SilentlyContinue
+        Write-Log ('  account re-registered as: {0}' -f $rekey.PSChildName)
+        if ($rp.UserEmail)  { Write-Log ('  user:   {0}' -f $rp.UserEmail) }
+        if ($rp.UserFolder) {
+            Write-Log ('  folder: {0}' -f $rp.UserFolder)
+            Write-Log ('  folder exists: {0}' -f (Test-Path -LiteralPath $rp.UserFolder))
+        }
+        Write-Log 'VERIFIED-COMPLETE: OneDrive signed back in and re-registered the account.'
+    }
+    else {
+        Write-Log 'VERIFICATION FAILED: OneDrive has not re-registered the account yet.'
+        Write-Log '  If a OneDrive sign-in window is open on the user desktop, it needs answering.'
+        Write-Log '  Otherwise OneDrive is still starting - run the script again to re-check.'
+    }
     Write-Log "Log file: $($script:LogFile)"
 }
 
@@ -257,18 +313,24 @@ function Invoke-AsLoggedOnUser {
 
     # -- stage a readable copy of this same file -----------------------------
     $self = $script:SelfPath
-    if (-not $self -or -not (Test-Path -LiteralPath $self)) {
-        throw 'Cannot determine this script''s own path. Save it as a .ps1 file and run it as a file.'
+    $haveFile = $self -and (Test-Path -LiteralPath $self)
+    if (-not $haveFile -and -not $script:SelfText) {
+        throw 'Cannot determine this script''s own source. Save it as a .ps1 file and run it as a file.'
     }
     $stageDir = 'C:\ProgramData\OneDriveRelink'
     $null = New-Item -ItemType Directory -Path $stageDir -Force
     $staged = $stageDir + '\Reset-OneDriveLink.ps1'
-    if ((Resolve-Path -LiteralPath $self).Path -ne $staged) {
+    if ($haveFile -and (Resolve-Path -LiteralPath $self).Path -eq $staged) {
+        Write-Log "Already staged at: $staged"
+    }
+    elseif ($haveFile) {
         Copy-Item -LiteralPath $self -Destination $staged -Force
         Write-Log "Staged copy: $staged"
     }
     else {
-        Write-Log "Already staged at: $staged"
+        # Running from text: write the text back out so the task has something to run.
+        Set-Content -LiteralPath $staged -Value $script:SelfText -Encoding UTF8
+        Write-Log "Staged a copy of the running script text: $staged"
     }
 
     # -- profile dir of the target (via SID, not C:\Users\<name>) ------------
@@ -313,38 +375,83 @@ function Invoke-AsLoggedOnUser {
     # finishes in under a second never satisfies 'LastRunTime -gt $startedAt' and
     # the wait would run to the full timeout despite success. Allow slack.
     $notBefore = $startedAt.AddSeconds(-5)
+    $runStart  = (Get-Date).AddSeconds(-3)
+    $logDir    = '{0}\AppData\Local\OneDriveRelink' -f $profileDir
     $task = $null
     $info = $null
-    $done = $false
+    $logPath = $null
+    $shown = 0
+    $allText = ''
+    $script:Verified = $false
+
     try {
         Start-ScheduledTask -TaskName $taskName
-        Write-Log 'Started. Waiting for the user-session run...'
+        Write-Log 'Started. Live output from the user session follows.'
+        Write-Host ''
 
         $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
         $lastNote = Get-Date
-        do {
-            Start-Sleep -Seconds 2
+        while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 700
+
+            # pick up the payload's log as soon as it exists, then stream it
+            if (-not $logPath) {
+                $cand = Get-ChildItem -LiteralPath $logDir -Filter 'Relink-*.log' -ErrorAction SilentlyContinue |
+                            Where-Object { $_.LastWriteTime -ge $runStart } |
+                            Sort-Object LastWriteTime | Select-Object -Last 1
+                if ($cand) {
+                    $logPath = $cand.FullName
+                    Write-Log ('Live log: {0}' -f $logPath)
+                }
+            }
+            if ($logPath -and (Test-Path -LiteralPath $logPath)) {
+                $lines = @(Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue)
+                if ($lines.Count -gt $shown) {
+                    $lines[$shown..($lines.Count - 1)] | ForEach-Object { Write-Host ('    {0}' -f $_) }
+                    $shown = $lines.Count
+                    $allText = $lines -join "`n"
+                }
+            }
+
+            if ($allText -match '(?m)^.*VERIFIED-COMPLETE|(?m)^.*VERIFICATION FAILED|(?m)^.*VERIFICATION SKIPPED') { break }
+
             $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
             if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
-            $done = $task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore
-            if (-not $done -and ((Get-Date) - $lastNote).TotalSeconds -ge 30) {
-                Write-Log ('  still waiting - state: {0}, last result: {1}' -f `
-                    $task.State, $(if ($info) { $info.LastTaskResult } else { 'n/a' }))
+            # Task finished but nothing terminal was written: give it a moment, then stop.
+            if ($task -and $task.State -ne 'Running' -and $info -and $info.LastRunTime -ge $notBefore) {
+                Start-Sleep -Milliseconds 800
+                if ($logPath -and (Test-Path -LiteralPath $logPath)) {
+                    $lines = @(Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue)
+                    if ($lines.Count -gt $shown) {
+                        $lines[$shown..($lines.Count - 1)] | ForEach-Object { Write-Host ('    {0}' -f $_) }
+                        $shown = $lines.Count
+                        $allText = $lines -join "`n"
+                    }
+                }
+                if ($allText -match 'VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED') { break }
+                Write-Log 'Payload exited without reporting a verdict.'
+                break
+            }
+
+            if (((Get-Date) - $lastNote).TotalSeconds -ge 30) {
+                Write-Log ('  still working - {0}s elapsed' -f [int](((Get-Date) - $startedAt).TotalSeconds))
                 $lastNote = Get-Date
             }
-        } while (-not $done -and (Get-Date) -lt $deadline)
+        }
 
-        if (-not $done) {
-            Write-Log "TIMED OUT after $TimeoutSeconds s (state: $($task.State)). The payload may still be running."
+        if ($allText -match 'VERIFIED-COMPLETE') {
+            $script:Verified = $true
+            Write-Log 'Payload verified the re-link.'
         }
-        elseif ($info.LastTaskResult -eq 0) {
-            Write-Log 'Task exit code 0 - payload reported success.'
+        elseif ($allText -match 'VERIFICATION SKIPPED') {
+            Write-Log 'Payload skipped verification (-NoRestart).'
         }
-        elseif ($info.LastTaskResult -eq 1) {
-            Write-Log 'Task exit code 1 - payload hit an error, see its log below.'
+        elseif ($allText -match 'VERIFICATION FAILED') {
+            Write-Log 'Payload could not confirm the re-link.'
         }
         else {
-            Write-Log ("Task exit code {0} (0x{0:X})" -f $info.LastTaskResult)
+            Write-Log ('No verdict after {0}s (task state: {1}). The payload may still be running.' -f `
+                        $TimeoutSeconds, $(if ($task) { $task.State } else { 'unknown' }))
         }
     }
     finally {
@@ -352,47 +459,59 @@ function Invoke-AsLoggedOnUser {
         Write-Log "Task removed: $taskName"
     }
 
-    # -- show what the payload logged -----------------------------------------
-    $logDir = '{0}\AppData\Local\OneDriveRelink' -f $profileDir
-    if (Test-Path -LiteralPath $logDir) {
-        $log = Get-ChildItem -LiteralPath $logDir -Filter 'Relink-*.log' -ErrorAction SilentlyContinue |
-                   Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        if ($log) {
-            Write-Log "Log: $($log.FullName)"
-            Get-Content -LiteralPath $log.FullName | ForEach-Object { Write-Host "    $_" }
-        }
-        $backups = Get-ChildItem -LiteralPath $logDir -Filter '*.reg' -ErrorAction SilentlyContinue
-        if ($backups) {
-            Write-Log 'Registry backups (revert with: reg import <file>):'
-            $backups | ForEach-Object { Write-Host "    $($_.FullName)" }
-        }
-    }
-    else {
-        Write-Log "No log directory at $logDir - the payload never ran as that user."
+    # -- where to look afterwards ---------------------------------------------
+    if ($logPath) { Write-Log "Log kept at: $logPath" }
+    $backups = Get-ChildItem -LiteralPath $logDir -Filter '*.reg' -ErrorAction SilentlyContinue
+    if ($backups) {
+        Write-Log 'Registry backups (revert with: reg import <file>):'
+        $backups | Sort-Object LastWriteTime -Descending | Select-Object -First 3 |
+            ForEach-Object { Write-Host ('    {0}' -f $_.FullName) }
     }
 }
 
 # =============================================================================
 #  MAIN
 # =============================================================================
-$ident    = [Security.Principal.WindowsIdentity]::GetCurrent()
-$isSystem = $ident.IsSystem
+$script:Verified = $false
+$script:ExitCode = 0
 
+# NOTE: never 'exit' here. This script is run from text (pasted, or fetched and invoked
+# in memory), and 'exit' in that context terminates the host - which closes the console
+# the operator is working in. A return code is set instead and the caller decides.
 try {
+    $ident    = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $isSystem = $ident.IsSystem
+
     if ($Payload -or -not $isSystem) {
         # Running as the user (or as the scheduled task) - do the work.
         Invoke-OneDriveWork -Account $Account -UseReset:$UseReset -NoRestart:$NoRestart
-        exit 0
     }
-
-    # Running as SYSTEM - bridge into the logged-on user's session.
-    Write-Log "SYSTEM mode on $env:COMPUTERNAME - bridging into the logged-on user session"
-    Invoke-AsLoggedOnUser -User $User -Account $Account -UseReset:$UseReset `
-        -NoRestart:$NoRestart -TimeoutSeconds $TimeoutSeconds
-    Write-Log 'Completed successfully.'
-    exit 0
+    else {
+        # Running as SYSTEM - bridge into the logged-on user's session.
+        Write-Log "SYSTEM mode on $env:COMPUTERNAME - bridging into the logged-on user session"
+        Invoke-AsLoggedOnUser -User $User -Account $Account -UseReset:$UseReset `
+            -NoRestart:$NoRestart -TimeoutSeconds $TimeoutSeconds
+    }
 }
 catch {
     Write-Log "ERROR: $($_.Exception.Message)"
-    exit 1
+    $script:ExitCode = 1
+    $script:Verified = $false
+}
+
+Write-Host ''
+if ($script:ExitCode -ne 0) {
+    Write-Host 'RESULT: FAILED - see the message above.' -ForegroundColor Red
+}
+elseif ($script:Verified) {
+    Write-Host 'RESULT: VERIFIED - OneDrive is unlinked, re-linked and signed back in.' -ForegroundColor Green
+    Write-Host '        The account re-registered itself; no further action needed.'
+}
+elseif ($NoRestart) {
+    Write-Host 'RESULT: UNLINKED - OneDrive left stopped (-NoRestart), so nothing was re-linked.' -ForegroundColor Yellow
+}
+else {
+    Write-Host 'RESULT: NOT VERIFIED - OneDrive did not re-register within the wait.' -ForegroundColor Yellow
+    Write-Host '        If a sign-in window is open on the user desktop, it needs answering.'
+    Write-Host '        Re-run to check again, or read the log named above.'
 }

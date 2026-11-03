@@ -198,15 +198,37 @@ account. This un-links and re-links it. **Their files are not deleted.**
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/f5a3c6d707691e3ce89c9c72123a5d78d7dfdd67/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
 If the person uses only a work/school account you can leave `-Account All` off.
 
+You get **live output as it happens** — every line the work writes appears in your console
+as it is written, from inside the user's session:
+
+```
+[16:38:17] Target user: IBN\amai
+[16:38:19] Unlinking Business1 (amai@example.com) - folder: C:\Users\amai\OneDrive
+[16:38:19]   Registry backed up to ...\OneDrive-Business1-...reg
+[16:38:20]   Removed account registration Business1
+[16:38:21] Starting OneDrive to re-link
+[16:38:21] Waiting up to 120s for OneDrive to sign back in and re-register...
+[16:38:30]   account re-registered as: Business1
+[16:38:30] VERIFIED-COMPLETE: OneDrive signed back in and re-registered the account.
+
+RESULT: VERIFIED - OneDrive is unlinked, re-linked and signed back in.
+```
+
+**`RESULT: VERIFIED` is the only line that means it worked** — it appears only after
+OneDrive has re-created its own account registration. `NOT VERIFIED` means it had not
+signed back in within two minutes, which normally means a sign-in window is waiting on the
+user's desktop.
+
 OneDrive restarts by itself. If your organisation has not turned on "silently sign in",
 the user will see a OneDrive sign-in window — tell them it is coming, or run this while
-they are at lunch.
+they are at lunch. Nothing on their screen is taken over, and the script no longer closes
+your console when it finishes.
 
 ---
 
