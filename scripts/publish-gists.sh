@@ -19,6 +19,19 @@
 
 set -euo pipefail
 
+# On Git Bash for Windows, stop MSYS rewriting the /gists API path into a filesystem
+# path (gh would otherwise see "C:/Program Files/Git/gists/..."). Harmless elsewhere.
+export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:-/gists}"
+
+# If jq was just installed (e.g. via winget) and this shell predates the PATH update,
+# find it in the usual winget Links location so the script is self-sufficient.
+if ! command -v jq >/dev/null 2>&1; then
+  for d in "/c/Users/${USER:-$USERNAME}/AppData/Local/Microsoft/WinGet/Links" \
+           "${LOCALAPPDATA:-}/Microsoft/WinGet/Links"; do
+    if [ -n "$d" ] && [ -x "$d/jq.exe" ]; then PATH="$d:$PATH"; break; fi
+  done
+fi
+
 GH="${GH:-gh}"
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
@@ -41,6 +54,10 @@ ENTRIES=(
   "Add-PrinterAsUser.ps1|Add / remove / verify a network printer connection as the logged-on user"
   "Reset-OneDriveLink-2.ps1|Unlink and re-link OneDrive for the logged-on user"
   "OneDrive-Check.ps1|Read-only OneDrive health check for the logged-on user"
+  "Restart-OneDrive.ps1|Stop and restart OneDrive in the logged-on user's session"
+  "Remove-Printer-Paste.ps1|Remove a network printer connection from the logged-on user - paste-ready"
+  "Map-NetworkDrive.ps1|Map or unmap a network drive for the logged-on user"
+  "Reset-OutlookCache.ps1|Reset the Outlook cache (new or classic) for the logged-on user"
 )
 
 printf '%-28s %-9s %s\n' "FILE" "ACTION" "PINNED RAW URL"

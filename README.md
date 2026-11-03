@@ -15,8 +15,12 @@ You run one command from your remote-support tool. The script does the rest.
 | **Do all of the above from one menu** | `Start-PSToolkit.ps1` | [one paste, then answer questions](#one-paste-then-answer-questions-the-easiest-way) |
 | Add a printer for the person who is logged in | `Printer-Setup-Paste.ps1` | [step-by-step](#add-a-printer-the-whole-procedure) |
 | Check which printers they have, and whether one is missing | `Printer-Check.ps1` | [step-by-step](#check-what-printers-they-have) |
+| Remove a printer (or clear a half-installed one) | `Remove-Printer-Paste.ps1` | [remove a printer](#remove-a-printer) |
+| Map (or unmap) a network drive for the person | `Map-NetworkDrive.ps1` | [map a network drive](#map-a-network-drive) |
 | Fix OneDrive that will not sync / sign in | `Reset-OneDriveLink-2.ps1` | [step-by-step](#fix-onedrive) |
+| Just restart OneDrive (it is not running / is stuck) | `Restart-OneDrive.ps1` | [restart OneDrive](#restart-onedrive) |
 | **Check whether OneDrive is actually working** | `OneDrive-Check.ps1` | [check if OneDrive is working](#check-if-onedrive-is-working) |
+| Reset the Outlook cache (new or classic Outlook) | `Reset-OutlookCache.ps1` | [reset the Outlook cache](#reset-the-outlook-cache) |
 | Do any of the above from a saved file, with options | `Add-PrinterAsUser.ps1` | [REFERENCE.md](REFERENCE.md) |
 
 The printer scripts and the checker are also runnable by **copying and pasting** — no
@@ -43,7 +47,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/c5705049910763ca99d88a2103594ee4d18ac521/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/20bf7c19b6e1f3908cae36d34d81101e8418430b/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -86,7 +90,7 @@ put your printer's address there.
 #!ps
 #timeout=600000
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/f578a2557e0bb023a4c0ed94564a58046e55598e/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84a331b867018618e4bd1674c3c1fc3866546686/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Step 3.** Paste all four lines into the Commands box and run it.
@@ -157,7 +161,7 @@ Same idea, four lines, and this one only *looks* — it never changes anything.
 #!ps
 #timeout=600000
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/8f34d5f72fbecc143de8147dae2133aca535b66d/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/183f4c650c9f9c22eb521687472ca7d4a42332bf/Printer-Check.ps1 | iex
 ```
 
 Put the printer you are looking for on line 3, or the word `list` to see everything
@@ -209,7 +213,7 @@ account. This un-links and re-links it. **Their files are not deleted.**
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/cfca9e35a5f4573dfd192222924c18842daf85e8/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/50065adc03e8ed1c8282a9d81fd8f5f4dc517b98/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -259,7 +263,7 @@ changes nothing, so it is safe to run before deciding whether to re-link.
 #!ps
 #timeout=600000
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ef7b3fafd597b095270a418be208ae32101795ac/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ba7cd45578eb77e8689741830dad917f1051b197/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
@@ -298,6 +302,93 @@ RESULT: HEALTHY - OneDrive is running, signed in and writing to its log.
 **What it cannot do:** quota, and whether one particular file has uploaded. Those need
 OneDrive's own UI or the Microsoft APIs — this only reports what can be established on the
 machine without credentials.
+
+---
+
+## Remove a printer
+
+Removes a printer connection from the logged-in user. Use it to clear a printer they no
+longer need, or to fix a half-installed one (`Printer-Check.ps1` says `VERDICT: PARTIAL`)
+before adding it again cleanly. Same four-line shape as adding.
+
+```
+#!ps
+#timeout=600000
+$env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/dab0777896659b1f205f2bcbb6ae53a634a71dfa/Remove-Printer-Paste.ps1 | iex
+```
+
+It reads the printer back out of the user's list afterwards, so `RESULT: REMOVED` means it
+is really gone, not just that a command ran.
+
+---
+
+## Map a network drive
+
+Maps a drive letter to a shared folder **for the person logged in** — and because a mapped
+drive is per-user, doing this from a SYSTEM shell any other way maps it for SYSTEM, where
+the person never sees it. This bridges into their session and maps it there, persistently.
+
+```
+#!ps
+#timeout=600000
+$env:MapDriveLetter = 'Z'
+$env:MapDrivePath   = '\\SERVER\SHARE'
+irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/d40c060f192e4c6f86d1eeee99d2ad2a383cef82/Map-NetworkDrive.ps1 | iex
+```
+
+To **unmap** a drive, give the letter and set remove:
+
+```
+$env:MapDriveLetter = 'Z'
+$env:MapDriveRemove = 'true'
+```
+
+It does not send a password — the share must be reachable with the person's own identity
+(the usual case on a domain or Entra-joined PC). `RESULT: MAPPED` is confirmed by reading
+the mapping back from their profile.
+
+---
+
+## Restart OneDrive
+
+The light-touch fix for "OneDrive is not running" or "it is stuck". Stops OneDrive and starts
+it again in the person's session. It does **not** unlink or touch any account — for that use
+[Fix OneDrive](#fix-onedrive).
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/57cd57663057179b8f1525c0c3b62a284e7c068f/Restart-OneDrive.ps1 | iex
+```
+
+`RESULT: RUNNING` means the process came back up; `NOT RUNNING` usually means a sign-in window
+is waiting on the desktop, or the account needs re-linking.
+
+---
+
+## Reset the Outlook cache
+
+Detects whether the person uses **new Outlook** or **classic Outlook** and resets the right
+one: after closing Outlook it renames the cached-mailbox data (classic `.ost` files, or the
+new-Outlook `LocalCache` folder) so Outlook rebuilds it and re-syncs from the server. Files
+are **renamed, not deleted** (recoverable as `.old-<stamp>`), and classic `.pst` files —
+local-only data such as POP mail and archives — are never touched.
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/3fe7df2a87c7b103300850f0c9d25178dab229d1/Reset-OutlookCache.ps1 | iex
+```
+
+| Result | Means |
+|---|---|
+| `RESET` | the cache was renamed; Outlook rebuilds and re-syncs on next launch |
+| `NOTHING TO DO` | no Outlook cache was found to reset |
+| `FAILED` | something could not be renamed (Outlook may still be open) — see the PROBLEM line |
+
+By default it resets whichever is installed. To target one, set `$env:OutlookCacheMode` to
+`classic` or `new`.
 
 ---
 

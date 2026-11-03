@@ -13,8 +13,12 @@
 
         1  add a printer for the logged-in user
         2  check which printers they have (read-only)
-        3  fix OneDrive (unlink and re-link)
-        4  check OneDrive (read-only)
+        3  remove a printer
+        4  map a network drive
+        5  fix OneDrive (unlink and re-link)
+        6  restart OneDrive
+        7  check OneDrive (read-only)
+        8  reset the Outlook cache (new or classic)
 
       It does not contain any of that logic itself: it downloads the
       individual tool for the job you pick, so the tested scripts stay
@@ -38,16 +42,20 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.3.1'
+$version = '1.4.0'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
 # republishing a tool, and the menu picks up the new build.
 $Urls = [ordered]@{
-    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
-    PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
-    OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
-    OneDriveChk  = 'https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
+    PrinterSetup    = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
+    PrinterCheck    = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
+    RemovePrinter   = 'https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1'
+    MapDrive        = 'https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1'
+    OneDrive        = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
+    RestartOneDrive = 'https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1'
+    OneDriveChk     = 'https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
+    OutlookCache    = 'https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.
@@ -192,7 +200,10 @@ function Get-ToolText {
 function Reset-Env {
     foreach ($n in 'PrinterSetupPath','PrinterSetupDefault','PrinterSetupElevated',
                    'PrinterSetupUser','PrinterSetupRead','PrinterSetupWait',
-                   'PrinterCheckPath','PrinterCheckUser','PrinterCheckRead') {
+                   'PrinterCheckPath','PrinterCheckUser','PrinterCheckRead',
+                   'PrinterRemovePath','PrinterRemoveUser','PrinterRemoveRead','PrinterRemoveWait',
+                   'MapDriveLetter','MapDrivePath','MapDriveUser','MapDriveRemove','MapDrivePersistent','MapDriveWait',
+                   'OneDriveRestartUser','OutlookCacheUser','OutlookCacheMode') {
         Remove-Item "Env:$n" -ErrorAction SilentlyContinue
     }
 }
@@ -369,6 +380,135 @@ function Job-OneDrive {
     }
 }
 
+function Job-RemovePrinter {
+    Head 'REMOVE A PRINTER FROM THE PERSON WHO IS LOGGED IN'
+
+    $queue = AskQueue -Why 'Which printer should be removed? Type its address.'
+    if ($null -eq $queue) { return }
+
+    $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
+    if ($null -eq $user) { return }
+
+    $script:CurrentTool = 'printer removal'
+    $text = Get-ToolText -Key RemovePrinter
+    if (-not $text) { return }
+
+    Reset-Env
+    $env:PrinterRemovePath = $queue
+    if ($user) { $env:PrinterRemoveUser = $user }
+
+    Line ''
+    Say "Removing $queue"
+    Line ''
+    Run-ToolText -Text $text
+}
+
+function Job-MapDrive {
+    Head 'MAP A NETWORK DRIVE FOR THE PERSON WHO IS LOGGED IN'
+
+    $remove = AskYN -Prompt 'Unmap (remove) a drive instead of mapping one?' -Default $false
+    if ($null -eq $remove) { return }
+
+    # Drive letter, asked until it is a single A-Z.
+    $letter = $null
+    for ($i = 0; $i -lt 5; $i++) {
+        $l = Ask -Prompt 'Drive letter (e.g. Z)'
+        if ($null -eq $l) { return }
+        $l = $l.TrimEnd('\').TrimEnd(':').Trim()
+        if ($l -match '^[A-Za-z]$') { $letter = $l.ToUpper(); break }
+        Line "  '$l' is not a single drive letter." -ForegroundColor Yellow
+    }
+    if (-not $letter) { return }
+
+    $share = ''
+    $persistent = $true
+    if (-not $remove) {
+        for ($i = 0; $i -lt 5; $i++) {
+            Line ''
+            Line '  Which shared folder? It looks like  \\SERVER\SHARE'
+            $s = Ask -Prompt 'Share'
+            if ($null -eq $s) { return }
+            $s = $s.Trim().TrimEnd('\')
+            if ($s -match '^\\\\[^\\]+\\.+') { $share = $s; break }
+            Line "  '$s' is not in the right form (\\server\share)." -ForegroundColor Yellow
+        }
+        if (-not $share) { return }
+
+        $persistent = AskYN -Prompt 'Reconnect it automatically at every sign-in?' -Default $true
+        if ($null -eq $persistent) { return }
+    }
+
+    $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
+    if ($null -eq $user) { return }
+
+    $script:CurrentTool = 'map network drive'
+    $text = Get-ToolText -Key MapDrive
+    if (-not $text) { return }
+
+    Reset-Env
+    $env:MapDriveLetter = $letter
+    if ($remove) {
+        $env:MapDriveRemove = 'true'
+    }
+    else {
+        $env:MapDrivePath = $share
+        if (-not $persistent) { $env:MapDrivePersistent = 'false' }
+    }
+    if ($user) { $env:MapDriveUser = $user }
+
+    Line ''
+    if ($remove) { Say "Unmapping ${letter}:" } else { Say "Mapping ${letter}: -> $share" }
+    Line ''
+    Run-ToolText -Text $text
+}
+
+function Job-RestartOneDrive {
+    Head 'RESTART ONEDRIVE FOR THE PERSON WHO IS LOGGED IN'
+    Line ''
+    Line '  Stops OneDrive and starts it again. Does not unlink or touch any'
+    Line '  account - for that use "Fix OneDrive".'
+    Line ''
+    $script:CurrentTool = 'OneDrive restart'
+    $text = Get-ToolText -Key RestartOneDrive
+    if (-not $text) { return }
+    Reset-Env
+    Line ''
+    Run-ToolText -Text $text
+}
+
+function Job-ResetOutlook {
+    Head 'RESET OUTLOOK CACHE FOR THE PERSON WHO IS LOGGED IN'
+    Line ''
+    Line '  Detects new or classic Outlook and renames its cache so Outlook'
+    Line '  rebuilds and re-syncs. Files are renamed (recoverable), never deleted.'
+    Line ''
+    $go = AskYN -Prompt 'This closes Outlook if it is open. Continue?' -Default $true
+    if ($null -eq $go -or -not $go) { return }
+
+    Line ''
+    Line '  Which Outlook?'
+    Line '    1  Both, whichever is installed  (the usual answer)'
+    Line '    2  Classic Outlook only'
+    Line '    3  New Outlook only'
+    $which = Ask -Prompt '  Choose 1-3' -Default '1'
+    if ($null -eq $which) { return }
+    $mode = switch ($which) { '2' { 'classic' } '3' { 'new' } default { 'both' } }
+
+    $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
+    if ($null -eq $user) { return }
+
+    $script:CurrentTool = 'Outlook cache reset'
+    $text = Get-ToolText -Key OutlookCache
+    if (-not $text) { return }
+
+    Reset-Env
+    $env:OutlookCacheMode = $mode
+    if ($user) { $env:OutlookCacheUser = $user }
+
+    Line ''
+    Run-ToolText -Text $text
+}
+
 # ---- fallback when there is no console to ask in ---------------------------
 function Show-Manual {
     Line ''
@@ -398,6 +538,28 @@ function Show-Manual {
     Line "    irm $($Urls.OneDrive) -OutFile `$f"
     Line "    & `$f -Account All"
     Line ''
+    Line '  REMOVE A PRINTER:'
+    Line "    #!ps"
+    Line "    #timeout=600000"
+    Line "    `$env:PrinterRemovePath = '\\SERVER\QUEUE-NAME'"
+    Line "    irm $($Urls.RemovePrinter) | iex"
+    Line ''
+    Line '  MAP A NETWORK DRIVE:'
+    Line "    #!ps"
+    Line "    #timeout=600000"
+    Line "    `$env:MapDriveLetter = 'Z'; `$env:MapDrivePath = '\\SERVER\SHARE'"
+    Line "    irm $($Urls.MapDrive) | iex"
+    Line ''
+    Line '  RESTART ONEDRIVE:'
+    Line "    #!ps"
+    Line "    #timeout=600000"
+    Line "    irm $($Urls.RestartOneDrive) | iex"
+    Line ''
+    Line '  RESET OUTLOOK CACHE:'
+    Line "    #!ps"
+    Line "    #timeout=600000"
+    Line "    irm $($Urls.OutlookCache) | iex"
+    Line ''
 }
 
 # ---- main ------------------------------------------------------------------
@@ -416,22 +578,30 @@ $didSomething = $false
     Rule
     Line '    1   Add a printer'
     Line '    2   Check which printers they have  (read-only)'
-    Line '    3   Fix OneDrive (unlink and re-link)'
-    Line '    4   Check OneDrive (read-only)'
-    Line '    5   Exit'
+    Line '    3   Remove a printer'
+    Line '    4   Map a network drive'
+    Line '    5   Fix OneDrive (unlink and re-link)'
+    Line '    6   Restart OneDrive'
+    Line '    7   Check OneDrive (read-only)'
+    Line '    8   Reset Outlook cache'
+    Line '    9   Exit'
     Line ''
-    $choice = Ask -Prompt '  Choose 1-5' -Default '5'
+    $choice = Ask -Prompt '  Choose 1-9' -Default '9'
     if ($null -eq $choice) { break main }
 
     switch ($choice) {
-        '1' { Line ''; Job-AddPrinter;    $didSomething = $true }
-        '2' { Line ''; Job-CheckPrinters; $didSomething = $true }
-        '3' { Line ''; Job-OneDrive;      $didSomething = $true }
-        '4' { Line ''; Job-OneDriveCheck; $didSomething = $true }
-        '5' { break main }
+        '1' { Line ''; Job-AddPrinter;      $didSomething = $true }
+        '2' { Line ''; Job-CheckPrinters;   $didSomething = $true }
+        '3' { Line ''; Job-RemovePrinter;   $didSomething = $true }
+        '4' { Line ''; Job-MapDrive;        $didSomething = $true }
+        '5' { Line ''; Job-OneDrive;        $didSomething = $true }
+        '6' { Line ''; Job-RestartOneDrive; $didSomething = $true }
+        '7' { Line ''; Job-OneDriveCheck;   $didSomething = $true }
+        '8' { Line ''; Job-ResetOutlook;    $didSomething = $true }
+        '9' { break main }
         default {
             Line ''
-            Line '  Please type 1, 2, 3, 4 or 5.' -ForegroundColor Yellow
+            Line '  Please type a number from 1 to 9.' -ForegroundColor Yellow
             continue main
         }
     }

@@ -16,7 +16,11 @@ staged copies the scheduled task executes, not something you place there by hand
 | Is OneDrive running, signed in, syncing? | [§1e](#1e-onedrive-checkps1--read-only-health-check) |
 | Add a printer for the person who is logged in | [§1b](#1b-printer-setup-pasteps1--no-upload-just-paste) paste-and-go, or [§1](#1-add-printerasuserps1) from a saved file |
 | Know whether a printer is already there / what they have | [§1c](#1c-printer-checkps1--read-only-paste-and-go) |
+| Remove a printer / clear a half-installed one | [§2a](#2a-remove-printer-pasteps1) |
+| Map or unmap a network drive for the person | [§2b](#2b-map-networkdriveps1) |
 | Fix OneDrive that will not sign in or sync | [§2](#2-reset-onedrivelink-2ps1) |
+| Just restart OneDrive (not running / stuck) | [§2c](#2c-restart-onedriveps1) |
+| Reset the Outlook cache (new or classic) | [§2d](#2d-reset-outlookcacheps1) |
 | My command died at 10 seconds / showed nothing | [§0a](#0a-screenconnect-commands-tab-the-10-second-kill) |
 | "Running scripts is disabled on this system" | [§0](#0-running-it--getting-past-the-execution-policy) |
 | A paste script refused to run and printed a red box | [§0b](#0b-required-environment-variables-paste-ready-scripts) |
@@ -340,7 +344,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/c5705049910763ca99d88a2103594ee4d18ac521/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/20bf7c19b6e1f3908cae36d34d81101e8418430b/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` check OneDrive (read-only),
@@ -373,7 +377,7 @@ others and prints a report ending in a verdict.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ef7b3fafd597b095270a418be208ae32101795ac/OneDrive-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ba7cd45578eb77e8689741830dad917f1051b197/OneDrive-Check.ps1 | iex
 ```
 
 Checks, all in the user's own session:
@@ -463,6 +467,83 @@ to close the operator's console at the end of a run. A return code is set instea
 # specific user when several are logged on
 .\Reset-OneDriveLink-2.ps1 -Account All -User 'CONTOSO\jsmith'
 ```
+
+---
+
+## 2a. Remove-Printer-Paste.ps1
+
+Removes a printer connection from the logged-on user; the counterpart to
+`Printer-Setup-Paste.ps1`. Paste-ready, env-var driven, bridges from SYSTEM into the user
+session, and reads the connection back out so `RESULT: REMOVED` is verified, not assumed.
+
+| Variable | Meaning |
+|---|---|
+| `PrinterRemovePath` | **required** — `\\server\queue` to remove |
+| `PrinterRemoveUser` | `'DOMAIN\name'` to choose the user when several are logged on |
+| `PrinterRemoveRead` | `'true'` prints the last result and stops; needs no queue |
+
+Use it on a `VERDICT: PARTIAL` from `Printer-Check.ps1` (listed but no HKCU key, or the
+reverse): remove, then add again with `Printer-Setup-Paste.ps1`.
+
+---
+
+## 2b. Map-NetworkDrive.ps1
+
+Maps or unmaps a drive letter for the logged-on user. A mapped drive is per-user data
+(`HKCU\Network`), so a SYSTEM-shell map any other way lands in SYSTEM's profile; this bridges
+into the user session and maps it there. No credentials are passed — the share must be
+reachable with the user's own identity.
+
+| Variable | Meaning |
+|---|---|
+| `MapDriveLetter` | **required** — a single letter, e.g. `Z` (|: and \| trimmed) |
+| `MapDrivePath` | the share, `\\server\share` (required to map; omit when removing) |
+| `MapDriveRemove` | `'true'` unmaps the letter instead of mapping it |
+| `MapDrivePersistent` | `'false'` maps for this session only (default: persistent) |
+| `MapDriveUser` | `'DOMAIN\name'` to choose the user when several are logged on |
+
+Verification: for a persistent map, the `HKCU\Network\<letter>` key is read back; for a
+session-only map, the live drive list is checked.
+
+---
+
+## 2c. Restart-OneDrive.ps1
+
+Stops and restarts OneDrive.exe in the user session. The light-touch alternative to a full
+re-link — no account is touched. Verifies the process is running again before reporting
+`RESULT: RUNNING`.
+
+| Variable | Meaning |
+|---|---|
+| `OneDriveRestartUser` | `'DOMAIN\name'` to choose the user when several are logged on |
+
+Pair it with `OneDrive-Check.ps1`: if the check says `FAILED: OneDrive.exe is not running`,
+this is usually the fix.
+
+---
+
+## 2d. Reset-OutlookCache.ps1
+
+Detects **new Outlook** (`olk.exe`, package `Microsoft.OutlookForWindows`) vs **classic
+Outlook** (`outlook.exe`, `.ost` files under `%LOCALAPPDATA%\Microsoft\Outlook`) and resets
+the cache of whichever is present. After closing Outlook it **renames** (never deletes) the
+cache so it is recoverable:
+
+- **Classic** — each `*.ost` → `*.ost.old-<stamp>`. Cached Exchange/M365 mailboxes rebuild
+  and re-sync. `.pst` files (POP mail, archives, local-only data) are never touched.
+- **New** — the package `LocalCache` folder → `LocalCache.old-<stamp>`; new Outlook recreates
+  it and re-downloads from the cloud.
+
+| Variable | Meaning |
+|---|---|
+| `OutlookCacheMode` | `classic`, `new`, or `both` (default: both installed) |
+| `OutlookCacheUser` | `'DOMAIN\name'` to choose the user when several are logged on |
+
+| Result | Means |
+|---|---|
+| `RESET` | the cache was renamed; Outlook rebuilds and re-syncs on next launch |
+| `NOTHING TO DO` | no Outlook cache was found |
+| `FAILED` | a file could not be renamed — Outlook may still be open; see the PROBLEM line |
 
 ---
 
