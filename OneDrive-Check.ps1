@@ -32,10 +32,30 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$scriptVersion = '1.0.0'
+$scriptVersion = '1.0.1'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
+
+# Map the report's VERDICT into the one-line coloured RESULT. Shared so the direct-user
+# path and the SYSTEM-bridge path print the same final line (they used to differ: the
+# direct path returned early and never printed RESULT at all).
+function Show-Result {
+    param([string]$raw)
+    Write-Host ''
+    if ($raw -match 'VERDICT: HEALTHY') {
+        Write-Host 'RESULT: HEALTHY - OneDrive is running, signed in and writing to its log.' -ForegroundColor Green
+    }
+    elseif ($raw -match 'VERDICT: DEGRADED') {
+        Write-Host 'RESULT: DEGRADED - it is signed in, but something looks stuck or idle.' -ForegroundColor Yellow
+    }
+    elseif ($raw -match 'VERDICT: FAILED') {
+        Write-Host 'RESULT: FAILED - see the PROBLEM lines above.' -ForegroundColor Red
+    }
+    else {
+        Write-Host 'RESULT: UNKNOWN - no verdict in the report.' -ForegroundColor Yellow
+    }
+}
 
 # ---------------------------------------------------------------------------
 #  The probe. Runs inside the user's session: only there does HKCU mean the
@@ -203,8 +223,13 @@ if (-not $isSystem) {
     Say ('Running as {0} - checking in place.' -f $ident.Name)
     $out = Join-Path $env:TEMP ('OneDriveCheck-{0}.txt' -f $stamp)
     & $probe -OutFile $out
-    if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue }
+    $raw = ''
+    if (Test-Path -LiteralPath $out) {
+        $raw = Get-Content -LiteralPath $out -Raw -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
+    }
     Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+    Show-Result -raw $raw
     return
 }
 
@@ -279,16 +304,4 @@ else {
 }
 Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
 
-Write-Host ''
-if ($raw -match 'VERDICT: HEALTHY') {
-    Write-Host 'RESULT: HEALTHY - OneDrive is running, signed in and writing to its log.' -ForegroundColor Green
-}
-elseif ($raw -match 'VERDICT: DEGRADED') {
-    Write-Host 'RESULT: DEGRADED - it is signed in, but something looks stuck or idle.' -ForegroundColor Yellow
-}
-elseif ($raw -match 'VERDICT: FAILED') {
-    Write-Host 'RESULT: FAILED - see the PROBLEM lines above.' -ForegroundColor Red
-}
-else {
-    Write-Host 'RESULT: UNKNOWN - no verdict in the report.' -ForegroundColor Yellow
-}
+Show-Result -raw $raw
