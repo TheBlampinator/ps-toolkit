@@ -165,6 +165,7 @@ function Invoke-OneDriveWork {
         $removed = @()
         if (-not (Test-Path -LiteralPath $accountsKey)) {
             Write-Log 'No OneDrive accounts are registered; nothing to unlink.'
+            Write-Log 'NOTHING-TO-DO: this user has no OneDrive account registered.'
         }
         else {
             $targets = Get-ChildItem $accountsKey | Where-Object {
@@ -175,7 +176,25 @@ function Invoke-OneDriveWork {
                 }
             }
 
-            if (-not $targets) { Write-Log "No $Account account found to unlink." }
+            # 'All' should mean all. If the names do not match Business*/Personal - which
+            # happens with some Azure AD builds - fall back to every registered account
+            # rather than doing nothing and claiming success.
+            if (-not $targets -and $Account -eq 'All') {
+                $allKeys = @(Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue)
+                if ($allKeys.Count) {
+                    Write-Log ('No Business*/Personal key matched - treating every registered account as a target: {0}' -f `
+                                (($allKeys | Select-Object -ExpandProperty PSChildName) -join ', '))
+                    $targets = $allKeys
+                }
+            }
+
+            if (-not $targets) {
+                # Say exactly what IS registered - "no account found" alone is useless.
+                $present = @(Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue |
+                                Select-Object -ExpandProperty PSChildName)
+                Write-Log ('Accounts registered for this user: {0}' -f $(if ($present.Count) { $present -join ', ' } else { '(none)' }))
+                Write-Log ('No account matched ''{0}'' - nothing was unlinked.' -f $Account)
+            }
 
             foreach ($key in $targets) {
                 $name  = $key.PSChildName
@@ -219,8 +238,15 @@ function Invoke-OneDriveWork {
     }
 
     if (-not $removed -or -not $removed.Count) {
-        Write-Log 'Nothing was unlinked, so there is nothing to re-register.'
-        Write-Log 'VERIFIED-COMPLETE: no change was needed.'
+        # Nothing was unlinked, so there is nothing to verify. Reporting VERIFIED here
+        # would be a lie: it would tell the operator the fix worked when it never ran.
+        # If no accounts were registered at all, that is a different, expected outcome.
+        if (-not (Test-Path -LiteralPath $accountsKey)) {
+            Write-Log 'NOTHING-TO-DO: no OneDrive account is registered for this user.'
+        }
+        else {
+            Write-Log 'NOTHING-TO-DO: an account is registered but it did not match the requested one.'
+        }
         return
     }
 
@@ -413,7 +439,7 @@ function Invoke-AsLoggedOnUser {
                 }
             }
 
-            if ($allText -match '(?m)^.*VERIFIED-COMPLETE|(?m)^.*VERIFICATION FAILED|(?m)^.*VERIFICATION SKIPPED') { break }
+            if ($allText -match '(?m).*(VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO)') { break }
 
             $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
             if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
@@ -428,7 +454,7 @@ function Invoke-AsLoggedOnUser {
                         $allText = $lines -join "`n"
                     }
                 }
-                if ($allText -match 'VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED') { break }
+                if ($allText -match 'VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO') { break }
                 Write-Log 'Payload exited without reporting a verdict.'
                 break
             }
@@ -445,6 +471,10 @@ function Invoke-AsLoggedOnUser {
         }
         elseif ($allText -match 'VERIFICATION SKIPPED') {
             Write-Log 'Payload skipped verification (-NoRestart).'
+        }
+        elseif ($allText -match 'NOTHING-TO-DO') {
+            $script:Nothing = $true
+            Write-Log 'Payload found nothing to unlink.'
         }
         elseif ($allText -match 'VERIFICATION FAILED') {
             Write-Log 'Payload could not confirm the re-link.'
@@ -473,6 +503,7 @@ function Invoke-AsLoggedOnUser {
 #  MAIN
 # =============================================================================
 $script:Verified = $false
+$script:Nothing  = $false
 $script:ExitCode = 0
 
 # NOTE: never 'exit' here. This script is run from text (pasted, or fetched and invoked
@@ -506,6 +537,10 @@ if ($script:ExitCode -ne 0) {
 elseif ($script:Verified) {
     Write-Host 'RESULT: VERIFIED - OneDrive is unlinked, re-linked and signed back in.' -ForegroundColor Green
     Write-Host '        The account re-registered itself; no further action needed.'
+}
+elseif ($Script:Nothing) {
+    Write-Host 'RESULT: NOTHING TO DO - no OneDrive account matched, so nothing was unlinked.' -ForegroundColor Yellow
+    Write-Host '        The log lists the accounts that ARE registered, if any.'
 }
 elseif ($NoRestart) {
     Write-Host 'RESULT: UNLINKED - OneDrive left stopped (-NoRestart), so nothing was re-linked.' -ForegroundColor Yellow

@@ -42,7 +42,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/8c0e5e14b75bf798d8aa610ba55fc9781d29ea4f/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/8d3fe4cda28814749ab90d213ee47176c50bcf48/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -198,7 +198,7 @@ account. This un-links and re-links it. **Their files are not deleted.**
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/f5a3c6d707691e3ce89c9c72123a5d78d7dfdd67/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/ece5e6f139a9b2054f93cbbf0c209d4127fdd414/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 

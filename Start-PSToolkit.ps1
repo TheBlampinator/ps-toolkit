@@ -230,7 +230,10 @@ function Show-LatestLog {
     if ($SuccessPattern -and $raw -match $SuccessPattern) {
         Line ('  VERDICT: {0} - it worked.' -f $Label) -ForegroundColor Green
     }
-    elseif ($raw -match 'FAILED|not connected|ERROR|Access is denied|cannot') {
+    elseif ($raw -match 'NOTHING-TO-DO') {
+        Line '  VERDICT: NOTHING TO DO - no account matched; nothing was changed.' -ForegroundColor Yellow
+    }
+    elseif ($raw -match 'VERIFICATION FAILED|FAILED|not connected|ERROR|Access is denied|cannot') {
         Line '  VERDICT: FAILED - the reason is in the lines above.' -ForegroundColor Red
     }
     else {
@@ -334,7 +337,7 @@ function Job-OneDrive {
 
     if (-not $DryRun) {
         $show = AskYN -Prompt 'Show the latest OneDrive log now?' -Default $true
-        if ($show) { Show-LatestLog -Subfolder 'OneDriveRelink' -Filter 'Relink-*.log' -SuccessPattern 'Completed successfully' -Label 'RE-LINKED' }
+        if ($show) { Show-LatestLog -Subfolder 'OneDriveRelink' -Filter 'Relink-*.log' -SuccessPattern 'VERIFIED-COMPLETE' -Label 'RE-LINKED AND VERIFIED' }
     }
 }
 
