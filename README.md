@@ -65,7 +65,7 @@ Paste it and the script asks you what you want to do.
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/20bf7c19b6e1f3908cae36d34d81101e8418430b/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -73,7 +73,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54dd
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/20bf7c19b6e1f3908cae36d34d81101e8418430b/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -120,7 +120,7 @@ put your printer's address there.
 
 ```
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84a331b867018618e4bd1674c3c1fc3866546686/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -129,7 +129,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e
 #!ps
 #timeout=600000
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84a331b867018618e4bd1674c3c1fc3866546686/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Step 3.** Paste the block and run it.
@@ -200,7 +200,7 @@ Same idea, and this one only *looks* — it never changes anything.
 
 ```
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/183f4c650c9f9c22eb521687472ca7d4a42332bf/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -209,7 +209,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad55
 #!ps
 #timeout=600000
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/183f4c650c9f9c22eb521687472ca7d4a42332bf/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
 ```
 
 Put the printer you are looking for on line 3, or the word `list` to see everything
@@ -261,7 +261,7 @@ account. This un-links and re-links it. **Their files are not deleted.**
 
 ```
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/50065adc03e8ed1c8282a9d81fd8f5f4dc517b98/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -271,7 +271,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/50065adc03e8ed1c8282a9d81fd8f5f4dc517b98/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -321,7 +321,7 @@ changes nothing, so it is safe to run before deciding whether to re-link.
 
 ```
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ba7cd45578eb77e8689741830dad917f1051b197/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
@@ -331,7 +331,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed
 #!ps
 #timeout=600000
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ba7cd45578eb77e8689741830dad917f1051b197/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
