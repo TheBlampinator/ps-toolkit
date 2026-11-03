@@ -163,6 +163,7 @@ function Invoke-OneDriveWork {
 
         $accountsKey = 'HKCU:\Software\Microsoft\OneDrive\Accounts'
         $removed = @()
+        $removedFolder = @{}
         if (-not (Test-Path -LiteralPath $accountsKey)) {
             Write-Log 'No OneDrive accounts are registered; nothing to unlink.'
             Write-Log 'NOTHING-TO-DO: this user has no OneDrive account registered.'
@@ -216,6 +217,7 @@ function Invoke-OneDriveWork {
                 Remove-Item $key.PSPath -Recurse -Force
                 Write-Log "  Removed account registration $name"
                 $removed += $name
+                $removedFolder[$name] = [string]$props.UserFolder
 
                 $settings = Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\settings\$name"
                 if (Test-Path -LiteralPath $settings) {
@@ -253,39 +255,66 @@ function Invoke-OneDriveWork {
     # ---- verification ------------------------------------------------------
     # The only proof that the fix worked is OneDrive signing back in by itself and
     # re-creating the account registration. Watch for it in the user's own hive.
+    # Only accounts that had a folder were real. Empty registrations (no folder, no email)
+    # are leftovers; OneDrive will never re-create them, so requiring them back would make
+    # every run look like a partial failure.
+    $required = @($removed | Where-Object { $removedFolder[$_] })
+    $ghosts   = @($removed | Where-Object { -not $removedFolder[$_] })
+    if ($ghosts.Count) {
+        Write-Log ('Removed {0} empty leftover registration(s) that will not come back: {1}' -f `
+                    $ghosts.Count, ($ghosts -join ', '))
+    }
+    if (-not $required.Count) {
+        Write-Log 'NOTHING-TO-DO: only empty registrations were found; no real account was unlinked.'
+        return
+    }
+
     $waitSeconds = 120
-    Write-Log ('Waiting up to {0}s for OneDrive to sign back in and re-register...' -f $waitSeconds)
+    Write-Log ('Waiting up to {0}s for OneDrive to sign back in and re-register {1} account(s): {2}' -f `
+                $waitSeconds, $required.Count, ($required -join ', '))
     $deadline = (Get-Date).AddSeconds($waitSeconds)
-    $rekey = $null
+    $returned = @()
     $lastNote = Get-Date
-    while (-not $rekey -and (Get-Date) -lt $deadline) {
+    while ($returned.Count -lt $required.Count -and (Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 3
         if (Test-Path -LiteralPath $accountsKey) {
-            $rekey = Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue |
-                        Where-Object { $removed -contains $_.PSChildName } |
-                        Select-Object -First 1
+            $present = @(Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue |
+                            Select-Object -ExpandProperty PSChildName)
+            $returned = @($required | Where-Object { $present -contains $_ })
         }
-        if (-not $rekey -and ((Get-Date) - $lastNote).TotalSeconds -ge 15) {
-            $left = [int]($deadline - (Get-Date)).TotalSeconds
-            Write-Log ('  still waiting for sign-in - about {0}s left' -f [Math]::Max(0, $left))
+        if ($returned.Count -lt $required.Count -and ((Get-Date) - $lastNote).TotalSeconds -ge 15) {
+            $missingNow = @($required | Where-Object { $returned -notcontains $_ })
+            Write-Log ('  still waiting - back: {0} | not back: {1}' -f `
+                        $(if ($returned.Count) { $returned -join ', ' } else { 'none' }), ($missingNow -join ', '))
             $lastNote = Get-Date
         }
     }
 
-    if ($rekey) {
-        $rp = Get-ItemProperty $rekey.PSPath -ErrorAction SilentlyContinue
-        Write-Log ('  account re-registered as: {0}' -f $rekey.PSChildName)
-        if ($rp.UserEmail)  { Write-Log ('  user:   {0}' -f $rp.UserEmail) }
-        if ($rp.UserFolder) {
-            Write-Log ('  folder: {0}' -f $rp.UserFolder)
-            Write-Log ('  folder exists: {0}' -f (Test-Path -LiteralPath $rp.UserFolder))
+    # Per-account truth. Any single account returning is NOT success - unlinking three and
+    # getting one back leaves the other two broken, which is exactly what must not be
+    # reported as verified.
+    foreach ($n in $required) {
+        if ($returned -contains $n) {
+            $k = Get-ItemProperty ("HKCU:\Software\Microsoft\OneDrive\Accounts\$n") -ErrorAction SilentlyContinue
+            Write-Log ('  {0}: signed back in  ({1})' -f $n, $(if ($k.UserEmail) { $k.UserEmail } else { 'no email recorded' }))
         }
-        Write-Log 'VERIFIED-COMPLETE: OneDrive signed back in and re-registered the account.'
+        else {
+            Write-Log ('  {0}: NOT signed back in' -f $n)
+        }
+    }
+
+    if ($returned.Count -eq 0) {
+        Write-Log 'VERIFICATION FAILED: no account signed back in.'
+        Write-Log '  A OneDrive sign-in window is probably waiting on the user desktop.'
+    }
+    elseif ($returned.Count -lt $removed.Count) {
+        $missing = @($removed | Where-Object { $returned -notcontains $_ })
+        Write-Log ('PARTIAL-RESTORED: {0} of {1} accounts signed back in. Still missing: {2}' -f `
+                    $returned.Count, $required.Count, ($missing -join ', '))
+        Write-Log '  Those accounts need a sign-in (user action), or SilentAccountConfig enabled.'
     }
     else {
-        Write-Log 'VERIFICATION FAILED: OneDrive has not re-registered the account yet.'
-        Write-Log '  If a OneDrive sign-in window is open on the user desktop, it needs answering.'
-        Write-Log '  Otherwise OneDrive is still starting - run the script again to re-check.'
+        Write-Log ('VERIFIED-COMPLETE: all {0} account(s) signed back in and re-registered.' -f $required.Count)
     }
     Write-Log "Log file: $($script:LogFile)"
 }
@@ -472,6 +501,10 @@ function Invoke-AsLoggedOnUser {
         elseif ($allText -match 'VERIFICATION SKIPPED') {
             Write-Log 'Payload skipped verification (-NoRestart).'
         }
+        elseif ($allText -match 'PARTIAL-RESTORED') {
+            $script:Partial = $true
+            Write-Log 'Only some accounts signed back in.'
+        }
         elseif ($allText -match 'NOTHING-TO-DO') {
             $script:Nothing = $true
             Write-Log 'Payload found nothing to unlink.'
@@ -504,6 +537,7 @@ function Invoke-AsLoggedOnUser {
 # =============================================================================
 $script:Verified = $false
 $script:Nothing  = $false
+$script:Partial  = $false
 $script:ExitCode = 0
 
 # NOTE: never 'exit' here. This script is run from text (pasted, or fetched and invoked
@@ -537,6 +571,11 @@ if ($script:ExitCode -ne 0) {
 elseif ($script:Verified) {
     Write-Host 'RESULT: VERIFIED - OneDrive is unlinked, re-linked and signed back in.' -ForegroundColor Green
     Write-Host '        The account re-registered itself; no further action needed.'
+}
+elseif ($Script:Partial) {
+    Write-Host 'RESULT: PARTIAL - some accounts did not sign back in.' -ForegroundColor Yellow
+    Write-Host '        The log lists each account and whether it returned. Missing ones need a'
+    Write-Host '        sign-in, or SilentAccountConfig enabled.'
 }
 elseif ($Script:Nothing) {
     Write-Host 'RESULT: NOTHING TO DO - no OneDrive account matched, so nothing was unlinked.' -ForegroundColor Yellow

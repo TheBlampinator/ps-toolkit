@@ -375,11 +375,16 @@ a matching `RESULT:` line:
 | Marker | Meaning | Final line |
 |---|---|---|
 | `VERIFIED-COMPLETE` | OneDrive signed back in and re-created its account key | `RESULT: VERIFIED` (green) |
+| `PARTIAL-RESTORED` | some accounts came back, some did not (named in the log) | `RESULT: PARTIAL` |
+| `NOTHING-TO-DO` | nothing real was unlinked | `RESULT: NOTHING TO DO` |
 | `VERIFICATION FAILED` | not signed back in within 120 s | `RESULT: NOT VERIFIED` |
 | `VERIFICATION SKIPPED` | `-NoRestart` was used | `RESULT: UNLINKED` |
 
 Verification is a read of `HKCU:\Software\Microsoft\OneDrive\Accounts` **in the user's own
-hive** after the restart, so it can only pass if OneDrive really re-registered. A registry
+hive** after the restart, per account: every account that had a folder must come back before
+`VERIFIED` is claimed. Empty leftover registrations (no folder, no email) are removed but not
+required back, since OneDrive never re-creates them. Signing a *work* account back in needs
+either `SilentAccountConfig=1` or one user sign-in — unlinking it does not sign it in. A registry
 export of every removed account is kept in `%LOCALAPPDATA%\OneDriveRelink` for rollback.
 
 **It never calls `exit`.** These scripts are routinely run from text (pasted, or fetched and
