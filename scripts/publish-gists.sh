@@ -57,6 +57,7 @@ ENTRIES=(
   "Restart-OneDrive.ps1|Stop and restart OneDrive in the logged-on user's session"
   "Remove-Printer-Paste.ps1|Remove a network printer connection from the logged-on user - paste-ready"
   "Map-NetworkDrive.ps1|Map or unmap a network drive for the logged-on user"
+  "Reinstall-OneDrive.ps1|Uninstall and reinstall OneDrive for the logged-on user - paste-ready, ScreenConnect Commands tab ready"
   "Reset-OutlookCache.ps1|Reset the Outlook cache (new or classic) for the logged-on user"
 )
 

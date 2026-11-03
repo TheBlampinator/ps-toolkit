@@ -11,14 +11,11 @@
       want to do, then asks only the questions that job needs. You
       never edit a script and never remember a variable name.
 
-        1  add a printer for the logged-in user
-        2  check which printers they have (read-only)
-        3  remove a printer
-        4  map a network drive
-        5  fix OneDrive (unlink and re-link)
-        6  restart OneDrive
-        7  check OneDrive (read-only)
-        8  reset the Outlook cache (new or classic)
+        PRINTERS        1 add   2 check (read-only)   3 remove
+        ONEDRIVE        4 fix (unlink and re-link)   5 restart   6 check (read-only)
+                        7 reinstall (uninstall, then install again)
+        OUTLOOK         8 reset the cache (new or classic)
+        NETWORK DRIVES  9 map or unmap a drive
 
       It does not contain any of that logic itself: it downloads the
       individual tool for the job you pick, so the tested scripts stay
@@ -42,7 +39,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.4.0'
+$version = '1.5.0'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
@@ -56,6 +53,7 @@ $Urls = [ordered]@{
     RestartOneDrive = 'https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1'
     OneDriveChk     = 'https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
     OutlookCache    = 'https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1'
+    ReinstallOneDrive = 'https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.
@@ -203,7 +201,7 @@ function Reset-Env {
                    'PrinterCheckPath','PrinterCheckUser','PrinterCheckRead',
                    'PrinterRemovePath','PrinterRemoveUser','PrinterRemoveRead','PrinterRemoveWait',
                    'MapDriveLetter','MapDrivePath','MapDriveUser','MapDriveRemove','MapDrivePersistent','MapDriveWait',
-                   'OneDriveRestartUser','OutlookCacheUser','OutlookCacheMode') {
+                   'OneDriveRestartUser','OutlookCacheUser','OutlookCacheMode','OneDriveReinstallUser') {
         Remove-Item "Env:$n" -ErrorAction SilentlyContinue
     }
 }
@@ -509,6 +507,32 @@ function Job-ResetOutlook {
     Run-ToolText -Text $text
 }
 
+function Job-ReinstallOneDrive {
+    Head 'REINSTALL ONEDRIVE (uninstall, then install again)'
+    Line ''
+    Line '  Closes OneDrive, uninstalls it, installs the current version from'
+    Line '  Microsoft and starts it. Synced files are not touched. Nothing is'
+    Line '  uninstalled unless a Microsoft-signed installer was obtained first.'
+    Line ''
+    Line '  Heads up: unless your organisation turns on silent sign-in, the user may' -ForegroundColor Yellow
+    Line '  see a OneDrive sign-in window afterwards.' -ForegroundColor Yellow
+    $go = AskYN -Prompt 'Continue?' -Default $false
+    if ($null -eq $go -or -not $go) { return }
+
+    $user = Ask -Prompt 'If more than one person is logged on, type DOMAIN\name (else press Enter)'
+    if ($null -eq $user) { return }
+
+    $script:CurrentTool = 'OneDrive reinstall'
+    $text = Get-ToolText -Key ReinstallOneDrive
+    if (-not $text) { return }
+
+    Reset-Env
+    if ($user) { $env:OneDriveReinstallUser = $user }
+
+    Line ''
+    Run-ToolText -Text $text
+}
+
 # ---- fallback when there is no console to ask in ---------------------------
 function Show-Manual {
     Line ''
@@ -560,6 +584,11 @@ function Show-Manual {
     Line "    #timeout=600000"
     Line "    irm $($Urls.OutlookCache) | iex"
     Line ''
+    Line '  REINSTALL ONEDRIVE:'
+    Line "    #!ps"
+    Line "    #timeout=600000"
+    Line "    irm $($Urls.ReinstallOneDrive) | iex"
+    Line ''
 }
 
 # ---- main ------------------------------------------------------------------
@@ -576,32 +605,42 @@ $didSomething = $false
     Rule
     Line '  What do you want to do?'
     Rule
+    Line '  PRINTERS' -ForegroundColor Cyan
     Line '    1   Add a printer'
     Line '    2   Check which printers they have  (read-only)'
     Line '    3   Remove a printer'
-    Line '    4   Map a network drive'
-    Line '    5   Fix OneDrive (unlink and re-link)'
-    Line '    6   Restart OneDrive'
-    Line '    7   Check OneDrive (read-only)'
-    Line '    8   Reset Outlook cache'
-    Line '    9   Exit'
     Line ''
-    $choice = Ask -Prompt '  Choose 1-9' -Default '9'
+    Line '  ONEDRIVE' -ForegroundColor Cyan
+    Line '    4   Fix OneDrive (unlink and re-link)'
+    Line '    5   Restart OneDrive'
+    Line '    6   Check OneDrive  (read-only)'
+    Line '    7   Reinstall OneDrive (uninstall, then install again)'
+    Line ''
+    Line '  OUTLOOK' -ForegroundColor Cyan
+    Line '    8   Reset Outlook cache'
+    Line ''
+    Line '  NETWORK DRIVES' -ForegroundColor Cyan
+    Line '    9   Map or unmap a network drive'
+    Line ''
+    Line '    0   Exit'
+    Line ''
+    $choice = Ask -Prompt '  Choose 0-9' -Default '0'
     if ($null -eq $choice) { break main }
 
     switch ($choice) {
-        '1' { Line ''; Job-AddPrinter;      $didSomething = $true }
-        '2' { Line ''; Job-CheckPrinters;   $didSomething = $true }
-        '3' { Line ''; Job-RemovePrinter;   $didSomething = $true }
-        '4' { Line ''; Job-MapDrive;        $didSomething = $true }
-        '5' { Line ''; Job-OneDrive;        $didSomething = $true }
-        '6' { Line ''; Job-RestartOneDrive; $didSomething = $true }
-        '7' { Line ''; Job-OneDriveCheck;   $didSomething = $true }
-        '8' { Line ''; Job-ResetOutlook;    $didSomething = $true }
-        '9' { break main }
+        '1' { Line ''; Job-AddPrinter;        $didSomething = $true }
+        '2' { Line ''; Job-CheckPrinters;     $didSomething = $true }
+        '3' { Line ''; Job-RemovePrinter;     $didSomething = $true }
+        '4' { Line ''; Job-OneDrive;          $didSomething = $true }
+        '5' { Line ''; Job-RestartOneDrive;   $didSomething = $true }
+        '6' { Line ''; Job-OneDriveCheck;     $didSomething = $true }
+        '7' { Line ''; Job-ReinstallOneDrive; $didSomething = $true }
+        '8' { Line ''; Job-ResetOutlook;      $didSomething = $true }
+        '9' { Line ''; Job-MapDrive;          $didSomething = $true }
+        '0' { break main }
         default {
             Line ''
-            Line '  Please type a number from 1 to 9.' -ForegroundColor Yellow
+            Line '  Please type a number from 0 to 9.' -ForegroundColor Yellow
             continue main
         }
     }

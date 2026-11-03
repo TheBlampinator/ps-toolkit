@@ -20,6 +20,7 @@ You run one command from your remote-support tool. The script does the rest.
 | Fix OneDrive that will not sync / sign in | `Reset-OneDriveLink-2.ps1` | [step-by-step](#fix-onedrive) |
 | Just restart OneDrive (it is not running / is stuck) | `Restart-OneDrive.ps1` | [restart OneDrive](#restart-onedrive) |
 | **Check whether OneDrive is actually working** | `OneDrive-Check.ps1` | [check if OneDrive is working](#check-if-onedrive-is-working) |
+| **Uninstall and reinstall OneDrive** | `Reinstall-OneDrive.ps1` | [reinstall OneDrive](#reinstall-onedrive) |
 | Reset the Outlook cache (new or classic Outlook) | `Reset-OutlookCache.ps1` | [reset the Outlook cache](#reset-the-outlook-cache) |
 | Do any of the above from a saved file, with options | `Add-PrinterAsUser.ps1` | [REFERENCE.md](REFERENCE.md) |
 
@@ -80,17 +81,26 @@ irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54dd
 ------------------------------------------------------------
   What do you want to do?
 ------------------------------------------------------------
+  PRINTERS
     1   Add a printer
     2   Check which printers they have  (read-only)
     3   Remove a printer
-    4   Map a network drive
-    5   Fix OneDrive (unlink and re-link)
-    6   Restart OneDrive
-    7   Check OneDrive (read-only)
-    8   Reset Outlook cache
-    9   Exit
 
-  Choose 1-9:
+  ONEDRIVE
+    4   Fix OneDrive (unlink and re-link)
+    5   Restart OneDrive
+    6   Check OneDrive  (read-only)
+    7   Reinstall OneDrive (uninstall, then install again)
+
+  OUTLOOK
+    8   Reset Outlook cache
+
+  NETWORK DRIVES
+    9   Map or unmap a network drive
+
+    0   Exit
+
+  Choose 0-9:
 ```
 
 Type `1` and it asks only the questions that job needs — the printer address, whether to
@@ -492,6 +502,43 @@ irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf
 
 By default it resets whichever is installed. To target one, set `$env:OutlookCacheMode` to
 `classic` or `new`.
+
+---
+
+## Reinstall OneDrive
+
+For OneDrive that is corrupt, will not start, or was not fixed by a restart or re-link. For the
+logged-on user it closes OneDrive, uninstalls it, installs the current version from Microsoft, and
+starts it.
+
+- **Safe order** - Microsoft's `OneDriveSetup.exe` is downloaded (or the copy that ships with
+  Windows is used) and its signature checked **before** anything is removed. If no trustworthy
+  installer is available, nothing is uninstalled.
+- Synced files and OneDrive folders are not touched. Unless the organisation has silent sign-in,
+  the user may see a OneDrive sign-in window afterwards.
+- Per-user installs only; a per-machine install (Program Files) is reported and left alone.
+
+**Backstage (live session) - paste as-is:**
+
+```
+irm https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
+```
+
+| Result | Means |
+|---|---|
+| `REINSTALLED` | OneDrive was uninstalled, installed again, and is running |
+| `NOTHING TO DO` | OneDrive is not installed for this user |
+| `FAILED` | see the FAILED line; if it failed before "Uninstalling", nothing was changed |
+
+If several people are logged on, set `$env:OneDriveReinstallUser = 'DOMAIN\name'` first.
 
 ---
 
