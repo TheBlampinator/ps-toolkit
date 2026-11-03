@@ -1,52 +1,52 @@
 {
   "Start-PSToolkit.ps1": {
     "id": "e8c8f5e9efb6689f285c9d54ddbfd46d",
-    "version": "20bf7c19b6e1f3908cae36d34d81101e8418430b",
+    "version": "2958327f77eba625bb0d168b0ecd10b282f9b3c5",
     "description": "Interactive menu that drives the toolkit tools - one paste, then answer questions"
   },
   "Printer-Setup-Paste.ps1": {
     "id": "84923f2c6a155cfa245a353e3e00f995",
-    "version": "84a331b867018618e4bd1674c3c1fc3866546686",
+    "version": "1724336bcf089698968ed685fd4cc4c7a22dd2d3",
     "description": "Printer setup for the logged-on user - paste-ready, ScreenConnect Commands tab ready"
   },
   "Printer-Check.ps1": {
     "id": "8905bde8066b4057770126ad5550f0ad",
-    "version": "183f4c650c9f9c22eb521687472ca7d4a42332bf",
+    "version": "d9c18d26db000801c7ce604d203b684a2e5a2ded",
     "description": "Read-only report of the logged-on user's printers - paste-ready"
   },
   "Add-PrinterAsUser.ps1": {
     "id": "42000b8cddae47063f738a8a214ca883",
-    "version": "b2fccece32081aa333fed3c7e87790eefb4f3441",
+    "version": "c29fe6f74d45c8fb0bbb697aea080ca268e4f093",
     "description": "Add / remove / verify a network printer connection as the logged-on user"
   },
   "Reset-OneDriveLink-2.ps1": {
     "id": "4faca813edea0891225baed59a7fb2db",
-    "version": "50065adc03e8ed1c8282a9d81fd8f5f4dc517b98",
+    "version": "d577e91812e5d1cbb30729144f750c6dc305048e",
     "description": "Unlink and re-link OneDrive for the logged-on user"
   },
   "OneDrive-Check.ps1": {
     "id": "cba2dc56424f35868221f9aeed2cc0a7",
-    "version": "ba7cd45578eb77e8689741830dad917f1051b197",
+    "version": "90cf75eeb32219015d5f25eacc7dc7cc820005c6",
     "description": "Read-only OneDrive health check for the logged-on user"
   },
   "Restart-OneDrive.ps1": {
     "id": "5f0bb5443756d90d4bf1dcffbe42f966",
-    "version": "57cd57663057179b8f1525c0c3b62a284e7c068f",
+    "version": "aa93178af498a2857eee4b1b36215250df25be5f",
     "description": "Stop and restart OneDrive in the logged-on user's session"
   },
   "Remove-Printer-Paste.ps1": {
     "id": "f0f01ce8ee39a3f2e7ccfdb0d9ba3707",
-    "version": "dab0777896659b1f205f2bcbb6ae53a634a71dfa",
+    "version": "9f41d4fc7fd813fca53a1677ec7c5295442567f4",
     "description": "Remove a network printer connection from the logged-on user - paste-ready"
   },
   "Map-NetworkDrive.ps1": {
     "id": "aeb934e2c6047d18c0536dec3bf9b8e1",
-    "version": "d40c060f192e4c6f86d1eeee99d2ad2a383cef82",
+    "version": "b3c9b5b6786084fc110d7191c6ebc3700e223bce",
     "description": "Map or unmap a network drive for the logged-on user"
   },
   "Reset-OutlookCache.ps1": {
     "id": "68abdad5f56cb478b9f1315acf7ce94f",
-    "version": "3fe7df2a87c7b103300850f0c9d25178dab229d1",
+    "version": "3bb921b957611d367d12b917374c545539a0b56b",
     "description": "Reset the Outlook cache (new or classic) for the logged-on user"
   }
 }

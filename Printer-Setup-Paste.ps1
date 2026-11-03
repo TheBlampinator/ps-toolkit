@@ -290,7 +290,7 @@ try {
         if (-not $added) {
             Write-Log 'Route 5: printui.dll'
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
-            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
                     -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
             $sw.Stop()
             # printui returns 0 even when it adds nothing, so this number is only a
@@ -321,7 +321,7 @@ try {
             Write-Log 'SetDefaultPrinter invoked.'
         }
         catch {
-            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
                     -ArgumentList ('printui.dll,PrintUIEntry /y /q /n "{0}"' -f $PrinterPath)
             Write-Log ('printui /y exit code: {0}' -f $p.ExitCode)
         }
@@ -600,7 +600,7 @@ try {
         Say ('SYSTEM shell - bridging into {0}' -f $User)
 
         $taskName = 'PrinterSetup-' + $stamp
-        $argLine = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}"{2}' -f `
+        $argLine = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}"{2}' -f `
                         $payloadFile, $PrinterPath, $(if ($SetDefault) { ' -SetDefault' } else { '' })
 
         $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine

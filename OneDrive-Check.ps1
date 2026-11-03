@@ -264,7 +264,7 @@ if (-not $profileDir) { $profileDir = 'C:\Users\' + ($target -split '\\')[-1] }
 
 $outFile  = '{0}\AppData\Local\Temp\OneDriveCheck-{1}.txt' -f $profileDir, $stamp
 $taskName = 'OneDriveCheck-' + $stamp
-$argLine  = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -OutFile "{1}"' -f $probe, $outFile
+$argLine  = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -OutFile "{1}"' -f $probe, $outFile
 
 $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine
 $principal = New-ScheduledTaskPrincipal -UserId $target -LogonType Interactive -RunLevel Limited

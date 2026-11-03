@@ -408,7 +408,7 @@ function Invoke-AsLoggedOnUser {
     # -- register and run the one-shot task ----------------------------------
     $taskName = 'OneDriveRelink-' + $stamp
     $argList = @(
-        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
         '-File', ('"{0}"' -f $staged), '-Payload', '-Account', $Account
     )
     if ($UseReset) { $argList += '-UseReset' }

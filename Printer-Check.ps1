@@ -263,7 +263,7 @@ try {
         # file in the user's own temp folder and we read that afterwards.
         $outFile  = '{0}\AppData\Local\Temp\PrinterCheck-{1}.txt' -f $profileDir, $stamp
         $taskName = 'PrinterCheck-' + $stamp
-        $argLine = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}" -OutFile "{2}"' -f `
+        $argLine = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}" -OutFile "{2}"' -f `
                         $payloadFile, $PrinterPath, $outFile
 
         $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine

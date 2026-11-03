@@ -183,7 +183,7 @@ function Invoke-AddPrinterWork {
             }
         }
         # /dn also cleans up a stale connection key when the printer is not visible.
-        $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+        $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
                 -ArgumentList ('printui.dll,PrintUIEntry /dn /q /n "{0}"' -f $PrinterPath)
         Write-Log "printui /dn exit code: $($p.ExitCode)"
         Start-Sleep -Seconds 1
@@ -212,7 +212,7 @@ function Invoke-AddPrinterWork {
             }
         }
         if (-not $added) {
-            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
                     -ArgumentList ('printui.dll,PrintUIEntry /in /q /n "{0}"' -f $PrinterPath)
             Write-Log "printui /in exit code: $($p.ExitCode)"
         }
@@ -241,7 +241,7 @@ function Invoke-AddPrinterWork {
             Write-Log 'SetDefaultPrinter invoked.'
         }
         catch {
-            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+            $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
                     -ArgumentList ('printui.dll,PrintUIEntry /y /q /n "{0}"' -f $PrinterPath)
             Write-Log "printui /y exit code: $($p.ExitCode)"
         }
@@ -342,7 +342,7 @@ function Invoke-AsLoggedOnUser {
     # -- register and run the one-shot task ----------------------------------
     $taskName = 'AddPrinter-' + $stamp
     $argList = @(
-        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
         '-File', ('"{0}"' -f $staged), '-Payload',
         '-PrinterPath', ('"{0}"' -f $PrinterPath)
     )

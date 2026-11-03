@@ -165,7 +165,7 @@ else {
 
     $outFile  = '{0}\AppData\Local\Temp\OneDriveRestart-{1}.txt' -f $profileDir, $stamp
     $taskName = 'OneDriveRestart-' + $stamp
-    $argLine  = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -OutFile "{1}"' -f $probe, $outFile
+    $argLine  = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -OutFile "{1}"' -f $probe, $outFile
 
     $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited

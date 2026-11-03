@@ -244,7 +244,7 @@ else {
 
     $outFile  = '{0}\AppData\Local\Temp\MapDrive-{1}.txt' -f $profileDir, $stamp
     $taskName = 'MapDrive-' + $stamp
-    $argParts = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $probe))
+    $argParts = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $probe))
     $argParts += @('-Letter', $Letter)
     if ($SharePath)  { $argParts += @('-SharePath', ('"{0}"' -f $SharePath)) }
     if ($Persistent) { $argParts += '-Persistent' }

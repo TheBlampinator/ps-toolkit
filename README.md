@@ -383,7 +383,7 @@ before adding it again cleanly. Same shape as adding.
 
 ```
 $env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/dab0777896659b1f205f2bcbb6ae53a634a71dfa/Remove-Printer-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -392,7 +392,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9
 #!ps
 #timeout=600000
 $env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/dab0777896659b1f205f2bcbb6ae53a634a71dfa/Remove-Printer-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
 ```
 
 It reads the printer back out of the user's list afterwards, so `RESULT: REMOVED` means it
@@ -411,7 +411,7 @@ the person never sees it. This bridges into their session and maps it there, per
 ```
 $env:MapDriveLetter = 'Z'
 $env:MapDrivePath   = '\\SERVER\SHARE'
-irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/d40c060f192e4c6f86d1eeee99d2ad2a383cef82/Map-NetworkDrive.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -421,7 +421,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3b
 #timeout=600000
 $env:MapDriveLetter = 'Z'
 $env:MapDrivePath   = '\\SERVER\SHARE'
-irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/d40c060f192e4c6f86d1eeee99d2ad2a383cef82/Map-NetworkDrive.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
 ```
 
 To **unmap** a drive, give the letter and set remove:
@@ -446,7 +446,7 @@ it again in the person's session. It does **not** unlink or touch any account â€
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/57cd57663057179b8f1525c0c3b62a284e7c068f/Restart-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -454,7 +454,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/57cd57663057179b8f1525c0c3b62a284e7c068f/Restart-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
 ```
 
 `RESULT: RUNNING` means the process came back up; `NOT RUNNING` usually means a sign-in window
@@ -473,7 +473,7 @@ local-only data such as POP mail and archives â€” are never touched.
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/3fe7df2a87c7b103300850f0c9d25178dab229d1/Reset-OutlookCache.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -481,7 +481,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/3fe7df2a87c7b103300850f0c9d25178dab229d1/Reset-OutlookCache.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
 ```
 
 | Result | Means |

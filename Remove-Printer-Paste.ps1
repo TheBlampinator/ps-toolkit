@@ -143,7 +143,7 @@ try {
         }
     }
     # /dn also clears a stale connection key when the printer is not visible.
-    $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait `
+    $p = Start-Process -FilePath 'rundll32.exe' -PassThru -Wait -WindowStyle Hidden `
             -ArgumentList ('printui.dll,PrintUIEntry /dn /q /n "{0}"' -f $PrinterPath)
     Write-Log ('printui /dn exit code: {0}' -f $p.ExitCode)
     Start-Sleep -Seconds 1
@@ -211,7 +211,7 @@ try {
         Say ('SYSTEM shell - bridging into {0}' -f $User)
 
         $taskName = 'PrinterRemove-' + $stamp
-        $argLine = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}"' -f $payloadFile, $PrinterPath
+        $argLine = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -PrinterPath "{1}"' -f $payloadFile, $PrinterPath
         $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine
         $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited
         $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `

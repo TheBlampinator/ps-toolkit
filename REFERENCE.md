@@ -366,10 +366,12 @@ That is what happens in a Commands tab that does not accept typed input.
 The tool URLs are pinned in `$Urls` at the top; republishing a tool means updating one
 line there.
 
-> **If a gist URL returns 404**, remove the `/raw/<sha>/` segment and use
-> `/raw/<file>` instead. GitHub's CDN caches a 404 against a revision-pinned path for a
-> gist whose revision it has not indexed yet, and the negative entry sticks. The unpinned
-> form always serves the latest published version.
+> **The paste one-liners use the unpinned `/raw/<file>` URL** (no revision hash). It is
+> shorter — so it survives copy/paste without wrapping onto a second line, which is the most
+> common way a paste breaks — and it always serves the latest published build, so the docs
+> never need re-pinning after a republish. The trade-off: GitHub's raw CDN can serve the
+> previous build for a minute or two right after `publish-gists.sh` runs. `scripts/gists.json`
+> records the exact published revision of each tool if you ever need to pin one.
 
 
 ---

@@ -220,7 +220,7 @@ else {
 
     $outFile  = '{0}\AppData\Local\Temp\OutlookCache-{1}.txt' -f $profileDir, $stamp
     $taskName = 'OutlookCache-' + $stamp
-    $argLine  = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -Mode {1} -OutFile "{2}"' -f $probe, $Mode, $outFile
+    $argLine  = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Mode {1} -OutFile "{2}"' -f $probe, $Mode, $outFile
 
     $action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited
