@@ -39,6 +39,7 @@ ENTRIES=(
   "Printer-Check.ps1|Read-only report of the logged-on user's printers - paste-ready"
   "Add-PrinterAsUser.ps1|Add / remove / verify a network printer connection as the logged-on user"
   "Reset-OneDriveLink-2.ps1|Unlink and re-link OneDrive for the logged-on user"
+  "OneDrive-Check.ps1|Read-only OneDrive health check for the logged-on user"
 )
 
 printf '%-28s %-9s %s\n' "FILE" "ACTION" "PINNED RAW URL"

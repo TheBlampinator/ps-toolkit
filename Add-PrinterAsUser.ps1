@@ -445,5 +445,13 @@ catch {
     $script:ExitCode = 1
 }
 
-# Never 'exit' - these scripts are run from text, and 'exit' closes the caller's console.
 if ($script:ExitCode -ne 0) { Write-Host 'RESULT: FAILED - see the message above.' -ForegroundColor Red }
+
+# Set the real process exit code ONLY when we were run from a file ($script:SelfPath is
+# set). The scheduled task invokes us with -File, and the SYSTEM-side bridge reads the
+# task's LastTaskResult to tell success from failure - without this the payload always
+# exited 0 and a failed add was reported as "exit code 0 - confirmed". A direct
+# '.\Add-PrinterAsUser.ps1 ... -Verify' from a file gets the documented exit 1 the same way.
+# When fetched and run from text (irm | iex), SelfPath is empty and 'exit' would close the
+# operator's console, so that path falls through without exiting.
+if ($script:SelfPath) { exit $script:ExitCode }

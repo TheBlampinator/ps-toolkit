@@ -18,5 +18,10 @@
     "id": "4faca813edea0891225baed59a7fb2db",
     "version": "56711c0a17594cb9732c68a379287dec062084f1",
     "description": "Unlink and re-link OneDrive for the logged-on user"
+  },
+  "OneDrive-Check.ps1": {
+    "id": "cba2dc56424f35868221f9aeed2cc0a7",
+    "version": "e668f0872dd62074d77265be9e26902d67f29c74",
+    "description": "Read-only OneDrive health check for the logged-on user"
   }
 }

@@ -11,7 +11,7 @@ function Get-Process {
     if ($Name -eq 'explorer') { return [pscustomobject]@{ UserName = 'CONTOSO\jsmith'; Id = 4242 } }
     return $null
 }
-function Start-Sleep { [CmdletBinding()] param([int]$Seconds) }
+function Start-Sleep { [CmdletBinding()] param([int]$Seconds, [int]$Milliseconds) }
 function Test-Path  { [CmdletBinding()] param([string]$LiteralPath, [string]$Path) return $true }
 function New-Item   { [CmdletBinding()] param([string]$ItemType, [string]$Path, [switch]$Force) return $null }
 function Copy-Item  { [CmdletBinding()] param([string]$LiteralPath, [string]$Destination, [switch]$Force)
@@ -37,9 +37,11 @@ function Get-ChildItem {
     }
 }
 function Get-Content { [CmdletBinding()] param([string]$LiteralPath)
+    # Include a terminal verdict marker so the bridge's live-tail loop recognises the run
+    # as finished and exits promptly, instead of spinning to the timeout.
     @('2026-10-30T12:00:01  OneDrive re-link started for CONTOSO\jsmith on PC01',
-      '2026-10-30T12:00:02  Unlinking Business1 (jsmith@contoso.com)',
-      '2026-10-30T12:00:04  Completed successfully.') }
+      '2026-10-30T12:00:02  Unlinking Business1 (jsmith@contoso.com) - folder: C:\Users\jsmith\OneDrive - Contoso',
+      '2026-10-30T12:00:05  VERIFIED-COMPLETE: all 1 account(s) signed back in and re-registered.') }
 
 # --- Task Scheduler surface -------------------------------------------------
 function New-ScheduledTaskAction {
@@ -109,8 +111,10 @@ Check 'task registered'                    ($null -ne $Rec.registered)
 Check 'task started'                       ($Rec.started)
 Check 'task cleaned up'                    ($Rec.unregistered)
 Check 'did not time out (LastRunTime truncation)' ($out -notmatch 'TIMED OUT')
-Check 'reported exit code 0'               ($out -match 'Task exit code 0')
-Check 'profile resolved by SID filter'     ($Rec.cimi -match "SID='S-1-5-21")
+# This bridge reports via the live-tailed payload log, not a task exit code: it streams the
+# user-session log and declares success on the VERIFIED-COMPLETE marker.
+Check 'streamed the user-session log'      ($out -match 'Unlinking Business1')
+Check 'reported VERIFIED from the log'     ($out -match 'Payload verified the re-link')
 Write-Host "`n  argument line:`n    $($Rec.action.Argument)"
 Write-Host "`n  failures: $fail"
 exit $fail

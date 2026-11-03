@@ -224,7 +224,7 @@ $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'   # required
 | `PrinterSetupElevated` | `'true'` only when the driver will not install |
 | `PrinterSetupUser` | `'DOMAIN\name'` to choose the user when several are logged on |
 | `PrinterSetupRead` | `'true'` prints the last result and stops; needs no queue |
-| `PrinterSetupWait` | seconds to wait for the result, default 25 |
+| `PrinterSetupWait` | seconds to wait for the result, default 180 (a first-time driver install is slow; the Commands-tab 10-second kill still lands first — see §0a) |
 
 What it does:
 
@@ -234,7 +234,9 @@ What it does:
    `C:\ProgramData\PrinterToolkit\PrinterSetup-<stamp>.ps1`.
 3. **Already the right user?** Runs the payload in place.
    **In a SYSTEM shell?** Registers a one-shot task owned by the logged-on user, runs the
-   payload there, and waits up to 25 s for it.
+   payload there, and waits for it (up to `PrinterSetupWait`, default 180 s). The read-back
+   one-liner is printed *before* the wait, so a Commands-tab 10-second kill still leaves you
+   with a way to read the result.
 4. Reads the connection back from `HKCU:\Printers\Connections` and the user's
    `Win32_Printer` list, then prints a green/red `RESULT:` line.
 5. Deletes the payload script and the task — unless it deferred to a later read, in which
@@ -341,8 +343,8 @@ fixing a tool updates the menu too.
 irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/d42bfc2ef9fa4c82c2b518eadf0a4b514291f676/Start-PSToolkit.ps1 | iex
 ```
 
-Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` exit. After each job it
-asks whether to do something else. Prompts are asked with `Read-Host`.
+Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` check OneDrive (read-only),
+`5` exit. After each job it asks whether to do something else. Prompts are asked with `Read-Host`.
 
 | Variable | Meaning |
 |---|---|

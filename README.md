@@ -53,9 +53,10 @@ irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54dd
     1   Add a printer
     2   Check which printers they have  (read-only)
     3   Fix OneDrive
-    4   Exit
+    4   Check OneDrive  (read-only)
+    5   Exit
 
-  Choose 1-4:
+  Choose 1-5:
 ```
 
 Type `1` and it asks only the questions that job needs — the printer address, whether to
@@ -363,7 +364,7 @@ Nothing appears on their screen and you never take over their desktop.
 - Logs: `C:\Users\<user>\AppData\Local\PrinterToolkit\` and `...\OneDriveRelink\`.
 - Tests (mock harnesses, run anywhere including Linux + PowerShell 7):
   `pwsh -File tests/test-printer.ps1` (26 assertions) and
-  `pwsh -File tests/test-bridge.ps1` (14 assertions, 1 requires Windows).
+  `pwsh -File tests/test-bridge.ps1` (14 assertions). Both exit non-zero on any failure.
 - Not code-signed. Add your own signing step if your environment requires it.
 - Requires outbound HTTPS to `gist.githubusercontent.com` for the paste-one-liners; on a
   box behind a strict egress proxy, save the file locally and run it instead.

@@ -619,6 +619,14 @@ try {
         # Wait for a terminal marker in the payload's log rather than for the task state:
         # the log tells us whether it actually succeeded.
         Say ('Waiting up to {0}s for the result...' -f $WaitSeconds)
+        # Print the read-back help BEFORE the wait, not only after it. The Commands tab kills
+        # this console at 10s - inside the wait loop - so anything printed after the loop is
+        # never seen on a first-time driver install. (Printer-Check.ps1 does the same.)
+        Write-Host '  If this console is killed before a result appears, read it in a few' -ForegroundColor DarkGray
+        Write-Host '  seconds with either of these (both are safe to repeat):' -ForegroundColor DarkGray
+        Write-Host "    Get-Content (Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' | Sort-Object LastWriteTime | Select-Object -Last 1).FullName -Tail 25" -ForegroundColor DarkGray
+        Write-Host "    `$env:PrinterSetupRead = 'true'; irm <this gist url> | iex" -ForegroundColor DarkGray
+        Write-Host ''
         $deadline = (Get-Date).AddSeconds($WaitSeconds)
         # Only a log written by THIS run counts. Without this filter the newest log is
         # whatever a previous attempt left behind, and its verdict is reported as if it
