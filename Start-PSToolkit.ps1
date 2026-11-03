@@ -38,7 +38,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.3.0'
+$version = '1.3.1'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
@@ -54,7 +54,14 @@ $Urls = [ordered]@{
 $DryRun = [bool]$env:PSToolkitDryRun
 
 # ---- little helpers --------------------------------------------------------
-function Line { param([string]$t = '') Write-Host $t }
+# Honour -ForegroundColor: every colour call in this file passes it, and a plain
+# 'param([string]$t)' silently swallowed the colour (an unbound named arg on a simple
+# function goes to $args), so the whole menu printed in the default colour.
+function Line {
+    param([string]$t = '', [System.ConsoleColor]$ForegroundColor)
+    if ($PSBoundParameters.ContainsKey('ForegroundColor')) { Write-Host $t -ForegroundColor $ForegroundColor }
+    else { Write-Host $t }
+}
 function Rule { param([string]$c = '-') Write-Host ($c * 60) }
 function Head { param([string]$t) Line ''; Rule '='; Write-Host "  $t"; Rule '=' }
 

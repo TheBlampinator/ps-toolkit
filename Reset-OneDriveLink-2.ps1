@@ -307,8 +307,11 @@ function Invoke-OneDriveWork {
         Write-Log 'VERIFICATION FAILED: no account signed back in.'
         Write-Log '  A OneDrive sign-in window is probably waiting on the user desktop.'
     }
-    elseif ($returned.Count -lt $removed.Count) {
-        $missing = @($removed | Where-Object { $returned -notcontains $_ })
+    elseif ($returned.Count -lt $required.Count) {
+        # Compare against $required, not $removed: $removed also holds empty "ghost"
+        # registrations that OneDrive never re-creates, so using $removed here reported
+        # a fully successful re-link as PARTIAL whenever a ghost had been cleaned up.
+        $missing = @($required | Where-Object { $returned -notcontains $_ })
         Write-Log ('PARTIAL-RESTORED: {0} of {1} accounts signed back in. Still missing: {2}' -f `
                     $returned.Count, $required.Count, ($missing -join ', '))
         Write-Log '  Those accounts need a sign-in (user action), or SilentAccountConfig enabled.'
