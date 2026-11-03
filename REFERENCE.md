@@ -45,6 +45,11 @@ Killed after 10000 milliseconds.
 The scheduled task it started keeps running (it belongs to the Task Scheduler service),
 so the work usually completes — you just lose the report.
 
+**Backstage (a live remote session) does not do this** — it is a real terminal, so you can
+paste the command without the modifiers and it waits for the full result. The modifiers
+below are only needed in the website Commands tab. README shows each tool
+[both ways](README.md#two-ways-to-paste-these).
+
 Fix: put these three lines at the **very top** of whatever you paste. They are
 ScreenConnect hashbang modifiers, read only by the Commands tab (in PowerShell they are
 ordinary `#` comments, so they are harmless anywhere else):
@@ -355,7 +360,7 @@ Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` check OneDriv
 | `PSToolkitDryRun` | `1` prints what would run and changes nothing — use it to rehearse |
 
 **No console to prompt in?** The first `Read-Host` that cannot get input sets an internal
-flag and the script prints the manual four-line command for every job instead of hanging.
+flag and the script prints the ready-made command for every job instead of hanging.
 That is what happens in a Commands tab that does not accept typed input.
 
 The tool URLs are pinned in `$Urls` at the top; republishing a tool means updating one

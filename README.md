@@ -40,9 +40,35 @@ You need two things:
 
 ---
 
+## Two ways to paste these
+
+ScreenConnect gives you two places to run a command, and they behave differently — so every
+tool below is shown **both ways**. Use the block that matches where you are working:
+
+- **Backstage** — the live terminal inside an active remote session. Paste the command
+  **as-is, without** the `#!ps` / `#timeout` lines. It is a real PowerShell window, so it
+  waits for the tool to finish and shows the full result.
+- **Commands tab** — the box on the ScreenConnect website that runs on the machine with **no**
+  remote session. It **kills any command after 10 seconds**, so the first two lines, `#!ps`
+  and `#timeout=600000`, are required and must sit together with no blank line between them.
+  The tools print a "read the result later" line before that kill lands.
+
+The `#!ps` / `#timeout` lines are only read by the Commands tab; in Backstage they are
+harmless comments, so the Commands-tab block also works there if you are ever unsure.
+
+---
+
 ## One paste, then answer questions (the easiest way)
 
-Paste these three lines and the script asks you what you want to do:
+Paste it and the script asks you what you want to do.
+
+**Backstage (live session) - paste as-is:**
+
+```
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/20bf7c19b6e1f3908cae36d34d81101e8418430b/Start-PSToolkit.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -56,11 +82,15 @@ irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54dd
 ------------------------------------------------------------
     1   Add a printer
     2   Check which printers they have  (read-only)
-    3   Fix OneDrive
-    4   Check OneDrive  (read-only)
-    5   Exit
+    3   Remove a printer
+    4   Map a network drive
+    5   Fix OneDrive (unlink and re-link)
+    6   Restart OneDrive
+    7   Check OneDrive (read-only)
+    8   Reset Outlook cache
+    9   Exit
 
-  Choose 1-5:
+  Choose 1-9:
 ```
 
 Type `1` and it asks only the questions that job needs — the printer address, whether to
@@ -74,7 +104,7 @@ Two things worth knowing:
   is fine. If your Commands tab cannot accept typed input, it prints the ready-made
   command for each job instead of waiting forever on a prompt.
 - **It downloads the individual tool for the job you pick**, so it runs exactly the same
-  tested code as the four-line commands further down this page. Nothing is duplicated.
+  tested code as the commands further down this page. Nothing is duplicated.
 
 ---
 
@@ -83,8 +113,17 @@ Two things worth knowing:
 **Step 1.** Open your remote-support tool (ScreenConnect / ConnectWise Control) and go
 to the **Commands** tab.
 
-**Step 2.** Copy these four lines. Change only the part inside the quotes on line 3 —
+**Step 2.** Copy the block below for where you are working. Change only the printer address inside the quotes —
 put your printer's address there.
+
+**Backstage (live session) - paste as-is:**
+
+```
+$env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84a331b867018618e4bd1674c3c1fc3866546686/Printer-Setup-Paste.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -93,7 +132,7 @@ $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
 irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/84a331b867018618e4bd1674c3c1fc3866546686/Printer-Setup-Paste.ps1 | iex
 ```
 
-**Step 3.** Paste all four lines into the Commands box and run it.
+**Step 3.** Paste the block and run it.
 
 **Step 4.** Wait for it. If the PC has never printed to that queue, the tool installs the
 printer's driver first — automatically, from the print server, with no window to click. That
@@ -138,7 +177,7 @@ $env:PrinterSetupElevated = 'true'
 If it still fails, the driver has to be put on the machine once by other means — see
 [REFERENCE.md §1b](REFERENCE.md#1b-printer-setup-pasteps1--no-upload-just-paste).
 
-### The four lines, explained
+### The lines, explained
 
 | Line | What it does |
 |---|---|
@@ -147,7 +186,7 @@ If it still fails, the driver has to be put on the machine once by other means �
 | `$env:PrinterSetupPath = '...'` | Tells the script **which** printer. It has no printer name built in. |
 | `irm ... \| iex` | Downloads the script and runs it in memory. Nothing is saved to the PC. |
 
-> **These four lines must sit together with no blank line between them.** If there is a
+> **In the Commands tab, the top lines must sit together with no blank line between them.** If there is a
 > blank line, ScreenConnect only reads the first special line and still kills the command
 > after 10 seconds. This is the single most common way this goes wrong.
 
@@ -155,7 +194,16 @@ If it still fails, the driver has to be put on the machine once by other means �
 
 ## Check what printers they have
 
-Same idea, four lines, and this one only *looks* — it never changes anything.
+Same idea, and this one only *looks* — it never changes anything.
+
+**Backstage (live session) - paste as-is:**
+
+```
+$env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/183f4c650c9f9c22eb521687472ca7d4a42332bf/Printer-Check.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -209,6 +257,16 @@ account. This un-links and re-links it. **Their files are not deleted.**
 >
 > **Personal** accounts usually sign back in on their own.
 
+**Backstage (live session) - paste as-is:**
+
+```
+$f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/50065adc03e8ed1c8282a9d81fd8f5f4dc517b98/Reset-OneDriveLink-2.ps1 -OutFile $f
+& $f -Account All
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
+
 ```
 #!ps
 #timeout=600000
@@ -258,6 +316,16 @@ when it finishes. A `.reg` backup of every removed account is kept in
 
 Read-only. Answers "is it running, is it signed in, and is it actually doing anything" — and
 changes nothing, so it is safe to run before deciding whether to re-link.
+
+**Backstage (live session) - paste as-is:**
+
+```
+$f = "$env:TEMP\OneDrive-Check.ps1"
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ba7cd45578eb77e8689741830dad917f1051b197/OneDrive-Check.ps1 -OutFile $f
+& $f
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -309,7 +377,16 @@ machine without credentials.
 
 Removes a printer connection from the logged-in user. Use it to clear a printer they no
 longer need, or to fix a half-installed one (`Printer-Check.ps1` says `VERDICT: PARTIAL`)
-before adding it again cleanly. Same four-line shape as adding.
+before adding it again cleanly. Same shape as adding.
+
+**Backstage (live session) - paste as-is:**
+
+```
+$env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
+irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/dab0777896659b1f205f2bcbb6ae53a634a71dfa/Remove-Printer-Paste.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -328,6 +405,16 @@ is really gone, not just that a command ran.
 Maps a drive letter to a shared folder **for the person logged in** — and because a mapped
 drive is per-user, doing this from a SYSTEM shell any other way maps it for SYSTEM, where
 the person never sees it. This bridges into their session and maps it there, persistently.
+
+**Backstage (live session) - paste as-is:**
+
+```
+$env:MapDriveLetter = 'Z'
+$env:MapDrivePath   = '\\SERVER\SHARE'
+irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/d40c060f192e4c6f86d1eeee99d2ad2a383cef82/Map-NetworkDrive.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -356,6 +443,14 @@ The light-touch fix for "OneDrive is not running" or "it is stuck". Stops OneDri
 it again in the person's session. It does **not** unlink or touch any account — for that use
 [Fix OneDrive](#fix-onedrive).
 
+**Backstage (live session) - paste as-is:**
+
+```
+irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/57cd57663057179b8f1525c0c3b62a284e7c068f/Restart-OneDrive.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
+
 ```
 #!ps
 #timeout=600000
@@ -374,6 +469,14 @@ one: after closing Outlook it renames the cached-mailbox data (classic `.ost` fi
 new-Outlook `LocalCache` folder) so Outlook rebuilds it and re-syncs from the server. Files
 are **renamed, not deleted** (recoverable as `.old-<stamp>`), and classic `.pst` files —
 local-only data such as POP mail and archives — are never touched.
+
+**Backstage (live session) - paste as-is:**
+
+```
+irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/3fe7df2a87c7b103300850f0c9d25178dab229d1/Reset-OutlookCache.ps1 | iex
+```
+
+**Commands tab (website, no remote session) - keep the top two lines together:**
 
 ```
 #!ps
@@ -396,7 +499,7 @@ By default it resets whichever is installed. To target one, set `$env:OutlookCac
 
 | What you see | What it means | What to do |
 |---|---|---|
-| `Killed after 10000 milliseconds` | ScreenConnect stopped the command after 10 seconds. | Check the four lines have no blank line between them. The work may still have happened — read the result (below). |
+| `Killed after 10000 milliseconds` | The website Commands tab stopped the command after 10 seconds (Backstage does not do this). | Check the `#!ps` / `#timeout` lines sit together with no blank line, or run it from Backstage. The work may still have happened — read the result (below). |
 | `STOPPED - ... NOTHING WAS CHANGED` | A setting was missing or the address was malformed. | Read the message, it shows the exact line to type. |
 | `Missing type name after '['` | You pasted *output* instead of the script. | The real script starts with `#!ps`. Clear the box and paste again. |
 | `Access is denied` | The driver could not be installed automatically. | Add `$env:PrinterSetupElevated = 'true'`. |
