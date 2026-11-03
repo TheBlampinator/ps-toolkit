@@ -35,6 +35,7 @@ USER_LOGIN="$("$GH" api user --jq .login)"
 
 # file|description
 ENTRIES=(
+  "Start-PSToolkit.ps1|Interactive menu that drives the toolkit tools - one paste, then answer questions"
   "Printer-Setup-Paste.ps1|Printer setup for the logged-on user - paste-ready, ScreenConnect Commands tab ready"
   "Printer-Check.ps1|Read-only report of the logged-on user's printers - paste-ready"
   "Add-PrinterAsUser.ps1|Add / remove / verify a network printer connection as the logged-on user"

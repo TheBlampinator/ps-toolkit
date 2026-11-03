@@ -1,27 +1,32 @@
 {
+  "Start-PSToolkit.ps1": {
+    "id": "e8c8f5e9efb6689f285c9d54ddbfd46d",
+    "version": "c5705049910763ca99d88a2103594ee4d18ac521",
+    "description": "Interactive menu that drives the toolkit tools - one paste, then answer questions"
+  },
   "Printer-Setup-Paste.ps1": {
     "id": "84923f2c6a155cfa245a353e3e00f995",
-    "version": "97c27b1f8b44afba0faa152df7f87a9f20eeae2f",
+    "version": "f578a2557e0bb023a4c0ed94564a58046e55598e",
     "description": "Printer setup for the logged-on user - paste-ready, ScreenConnect Commands tab ready"
   },
   "Printer-Check.ps1": {
     "id": "8905bde8066b4057770126ad5550f0ad",
-    "version": "043c4cf74703ae7c94ebbb36b538a504254d5b90",
+    "version": "8f34d5f72fbecc143de8147dae2133aca535b66d",
     "description": "Read-only report of the logged-on user's printers - paste-ready"
   },
   "Add-PrinterAsUser.ps1": {
     "id": "42000b8cddae47063f738a8a214ca883",
-    "version": "66bff4bcbb18ffd3a391bfdf3749b8603bc66f29",
+    "version": "cb4978bb362387b7b787765722346a7174a2cb76",
     "description": "Add / remove / verify a network printer connection as the logged-on user"
   },
   "Reset-OneDriveLink-2.ps1": {
     "id": "4faca813edea0891225baed59a7fb2db",
-    "version": "56711c0a17594cb9732c68a379287dec062084f1",
+    "version": "cfca9e35a5f4573dfd192222924c18842daf85e8",
     "description": "Unlink and re-link OneDrive for the logged-on user"
   },
   "OneDrive-Check.ps1": {
     "id": "cba2dc56424f35868221f9aeed2cc0a7",
-    "version": "e668f0872dd62074d77265be9e26902d67f29c74",
+    "version": "ef7b3fafd597b095270a418be208ae32101795ac",
     "description": "Read-only OneDrive health check for the logged-on user"
   }
 }

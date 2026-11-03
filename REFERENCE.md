@@ -340,7 +340,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/d42bfc2ef9fa4c82c2b518eadf0a4b514291f676/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/c5705049910763ca99d88a2103594ee4d18ac521/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` check OneDrive (read-only),
@@ -373,7 +373,7 @@ others and prints a report ending in a verdict.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/e668f0872dd62074d77265be9e26902d67f29c74/OneDrive-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ef7b3fafd597b095270a418be208ae32101795ac/OneDrive-Check.ps1 | iex
 ```
 
 Checks, all in the user's own session:

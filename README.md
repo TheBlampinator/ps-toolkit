@@ -43,7 +43,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/d42bfc2ef9fa4c82c2b518eadf0a4b514291f676/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/c5705049910763ca99d88a2103594ee4d18ac521/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -86,7 +86,7 @@ put your printer's address there.
 #!ps
 #timeout=600000
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/7066414df24068a10dd6483986cf7ea889a8e501/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/f578a2557e0bb023a4c0ed94564a58046e55598e/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Step 3.** Paste all four lines into the Commands box and run it.
@@ -157,7 +157,7 @@ Same idea, four lines, and this one only *looks* — it never changes anything.
 #!ps
 #timeout=600000
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/23ff3dbaedf1bb36af2b261d337164c937894fd1/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/8f34d5f72fbecc143de8147dae2133aca535b66d/Printer-Check.ps1 | iex
 ```
 
 Put the printer you are looking for on line 3, or the word `list` to see everything
@@ -209,7 +209,7 @@ account. This un-links and re-links it. **Their files are not deleted.**
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/d005b0ee99d7d06753a21d95dacedfc76d24cb59/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/cfca9e35a5f4573dfd192222924c18842daf85e8/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -259,7 +259,7 @@ changes nothing, so it is safe to run before deciding whether to re-link.
 #!ps
 #timeout=600000
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/e668f0872dd62074d77265be9e26902d67f29c74/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/ef7b3fafd597b095270a418be208ae32101795ac/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
