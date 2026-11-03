@@ -16,6 +16,7 @@ You run one command from your remote-support tool. The script does the rest.
 | Add a printer for the person who is logged in | `Printer-Setup-Paste.ps1` | [step-by-step](#add-a-printer-the-whole-procedure) |
 | Check which printers they have, and whether one is missing | `Printer-Check.ps1` | [step-by-step](#check-what-printers-they-have) |
 | Fix OneDrive that will not sync / sign in | `Reset-OneDriveLink-2.ps1` | [step-by-step](#fix-onedrive) |
+| **Check whether OneDrive is actually working** | `OneDrive-Check.ps1` | [check if OneDrive is working](#check-if-onedrive-is-working) |
 | Do any of the above from a saved file, with options | `Add-PrinterAsUser.ps1` | [REFERENCE.md](REFERENCE.md) |
 
 The printer scripts and the checker are also runnable by **copying and pasting** — no
@@ -42,7 +43,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/a8dc4d2c29feaddd78d376a798589fb0595043c3/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/d42bfc2ef9fa4c82c2b518eadf0a4b514291f676/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -248,6 +249,57 @@ when it finishes. A `.reg` backup of every removed account is kept in
 
 ---
 
+## Check if OneDrive is working
+
+Read-only. Answers "is it running, is it signed in, and is it actually doing anything" — and
+changes nothing, so it is safe to run before deciding whether to re-link.
+
+```
+#!ps
+#timeout=600000
+$f = "$env:TEMP\OneDrive-Check.ps1"
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/e668f0872dd62074d77265be9e26902d67f29c74/OneDrive-Check.ps1 -OutFile $f
+& $f
+```
+
+```
+Identity : AzureAD\DavidTeasdale
+Machine  : LAPTOP-HGS5N3AF
+
+Process  : running (1 instance(s), PID 28940)
+Version  : 24.151.0728.0003
+Uptime   : 0d 2h 14m
+Accounts : 2 registered
+  Business1
+    user   : david@example.com
+    folder : C:\Users\David\OneDrive - Example
+    exists : True
+  Personal
+    user   : (no email recorded)
+    folder : (none) - leftover registration, not a live account
+
+Log      : last written 1 min ago (Business1-20261103_0942.odl)
+Recent log lines worth reading: none of error/failed/quota/blocked in the last 400
+
+Business1: 12 item(s) at the top level, 4 cloud-only placeholder(s)
+
+VERDICT: HEALTHY
+
+RESULT: HEALTHY - OneDrive is running, signed in and writing to its log.
+```
+
+| Result | Means | What to do |
+|---|---|---|
+| `HEALTHY` | running, signed in, log is being written | nothing |
+| `DEGRADED` | signed in, but the log has not moved for 15+ min — idle or stuck | restart OneDrive, or re-link |
+| `FAILED` | not running, not signed in, or a sync folder is missing | fix the named PROBLEM line first |
+
+**What it cannot do:** quota, and whether one particular file has uploaded. Those need
+OneDrive's own UI or the Microsoft APIs — this only reports what can be established on the
+machine without credentials.
+
+---
+
 ## If something goes wrong
 
 | What you see | What it means | What to do |
@@ -260,6 +312,7 @@ when it finishes. A `.reg` backup of every removed account is kept in
 | `More than one user is logged on` | Two people are signed in; the script will not guess. | Add `$env:PrinterSetupUser = 'DOMAIN\name'`. |
 | `Nobody is logged on` | There is no user session to fix. | Ask them to sign in first. |
 | `VERDICT: ABSENT` | The printer really is not there. | Add it. |
+| OneDrive `RESULT: DEGRADED` | Running but its log is stale — idle or stuck | restart OneDrive, or re-link |
 | `RESULT: PARTIAL` (OneDrive) | Some accounts did not sign back in. | Sign the named account in; or enable silent sign-in. |
 
 ### Read the result without running anything again

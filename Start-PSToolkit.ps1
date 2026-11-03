@@ -14,6 +14,7 @@
         1  add a printer for the logged-in user
         2  check which printers they have (read-only)
         3  fix OneDrive (unlink and re-link)
+        4  check OneDrive (read-only)
 
       It does not contain any of that logic itself: it downloads the
       individual tool for the job you pick, so the tested scripts stay
@@ -37,7 +38,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.2.0'
+$version = '1.3.0'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
@@ -46,6 +47,7 @@ $Urls = [ordered]@{
     PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
     PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
     OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
+    OneDriveChk  = 'https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.
@@ -307,6 +309,19 @@ function Job-CheckPrinters {
     Run-ToolText -Text $text
 }
 
+function Job-OneDriveCheck {
+    Head 'CHECK ONEDRIVE (running? signed in? syncing?)'
+    Line ''
+    Line '  Read-only. Reports the process, the accounts, whether each sync'
+    Line '  folder exists, and how recently OneDrive wrote to its own log.'
+    Line ''
+    $script:CurrentTool = 'OneDrive check'
+    $text = Get-ToolText -Key OneDriveChk
+    if (-not $text) { return }
+    Line ''
+    Run-ToolText -Text $text
+}
+
 function Job-OneDrive {
     Head 'FIX ONEDRIVE (unlink and re-link)'
 
@@ -394,20 +409,22 @@ $didSomething = $false
     Rule
     Line '    1   Add a printer'
     Line '    2   Check which printers they have  (read-only)'
-    Line '    3   Fix OneDrive'
-    Line '    4   Exit'
+    Line '    3   Fix OneDrive (unlink and re-link)'
+    Line '    4   Check OneDrive (read-only)'
+    Line '    5   Exit'
     Line ''
-    $choice = Ask -Prompt '  Choose 1-4' -Default '4'
+    $choice = Ask -Prompt '  Choose 1-5' -Default '5'
     if ($null -eq $choice) { break main }
 
     switch ($choice) {
         '1' { Line ''; Job-AddPrinter;    $didSomething = $true }
         '2' { Line ''; Job-CheckPrinters; $didSomething = $true }
         '3' { Line ''; Job-OneDrive;      $didSomething = $true }
-        '4' { break main }
+        '4' { Line ''; Job-OneDriveCheck; $didSomething = $true }
+        '5' { break main }
         default {
             Line ''
-            Line '  Please type 1, 2, 3 or 4.' -ForegroundColor Yellow
+            Line '  Please type 1, 2, 3, 4 or 5.' -ForegroundColor Yellow
             continue main
         }
     }

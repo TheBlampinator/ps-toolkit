@@ -13,6 +13,7 @@ staged copies the scheduled task executes, not something you place there by hand
 | I want to… | Read |
 |---|---|
 | Do everything from a menu: pick a job, answer questions | [§1d](#1d-start-pstoolkitps1--interactive-menu) |
+| Is OneDrive running, signed in, syncing? | [§1e](#1e-onedrive-checkps1--read-only-health-check) |
 | Add a printer for the person who is logged in | [§1b](#1b-printer-setup-pasteps1--no-upload-just-paste) paste-and-go, or [§1](#1-add-printerasuserps1) from a saved file |
 | Know whether a printer is already there / what they have | [§1c](#1c-printer-checkps1--read-only-paste-and-go) |
 | Fix OneDrive that will not sign in or sync | [§2](#2-reset-onedrivelink-2ps1) |
@@ -337,7 +338,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/a8dc4d2c29feaddd78d376a798589fb0595043c3/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/d42bfc2ef9fa4c82c2b518eadf0a4b514291f676/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` exit. After each job it
@@ -359,6 +360,36 @@ line there.
 > gist whose revision it has not indexed yet, and the negative entry sticks. The unpinned
 > form always serves the latest published version.
 
+
+---
+
+## 1e. OneDrive-Check.ps1 — read-only health check
+
+No configuration, nothing to edit, changes nothing. Bridges into the user session like the
+others and prints a report ending in a verdict.
+
+```
+#!ps
+#timeout=600000
+irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/e668f0872dd62074d77265be9e26902d67f29c74/OneDrive-Check.ps1 | iex
+```
+
+Checks, all in the user's own session:
+
+| Check | How |
+|---|---|
+| process | `Get-Process OneDrive` — count, PID, file version, uptime, path |
+| sign-in | `HKCU:\Software\Microsoft\OneDrive\Accounts` — each account's email and folder |
+| folder | `Test-Path` on each `UserFolder`; a missing folder is a PROBLEM |
+| liveness | newest `*.odl` under `%LOCALAPPDATA%\Microsoft\OneDrive\logs`; 15+ min stale is a WARNING |
+| errors | last 400 lines of that log filtered for error/failed/quota/blocked/denied |
+| content | top-level item count and cloud-only placeholder count per folder |
+
+Verdict: `FAILED` if any problem, else `DEGRADED` if any warning, else `HEALTHY`.
+`RESULT:` repeats it in one line.
+
+Deliberately not attempted: quota and per-file sync state — both need Microsoft APIs or the
+OneDrive UI, and inventing them from local data would be a guess. Windows-only, as ever.
 
 ---
 
