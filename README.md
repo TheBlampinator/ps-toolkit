@@ -42,7 +42,7 @@ Paste these three lines and the script asks you what you want to do:
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/8d3fe4cda28814749ab90d213ee47176c50bcf48/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/a8dc4d2c29feaddd78d376a798589fb0595043c3/Start-PSToolkit.ps1 | iex
 ```
 
 ```

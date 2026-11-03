@@ -37,15 +37,15 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.1.0'
+$version = '1.2.0'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
 # republishing a tool, and the menu picks up the new build.
 $Urls = [ordered]@{
-    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/7066414df24068a10dd6483986cf7ea889a8e501/Printer-Setup-Paste.ps1'
-    PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/23ff3dbaedf1bb36af2b261d337164c937894fd1/Printer-Check.ps1'
-    OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/f5a3c6d707691e3ce89c9c72123a5d78d7dfdd67/Reset-OneDriveLink-2.ps1'
+    PrinterSetup = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
+    PrinterCheck = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
+    OneDrive     = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.
@@ -160,8 +160,13 @@ function Get-ToolText {
         return "param([string]`$Account, [switch]`$NoRestart) 'stub'"
     }
     Write-Host '  fetching the tool...' -ForegroundColor DarkGray
+    # Unpinned so this menu always gets the current published tool, plus a cache-buster
+    # because raw gist URLs are CDN-cached and can serve a stale build for minutes.
+    $url = $Urls[$Key]
+    $sep = if ($url.Contains('?')) { '&' } else { '?' }
+    $url = $url + $sep + 'v=' + [DateTime]::UtcNow.Ticks
     try {
-        return (Invoke-RestMethod -Uri $Urls[$Key])
+        return (Invoke-RestMethod -Uri $url)
     }
     catch {
         Line ''
@@ -197,6 +202,7 @@ function Run-ToolText {
         }
         return
     }
+    if ($Text -match "scriptVersion = '([0-9.]+)'") { Say ('  tool version {0}' -f $Matches[1]) }
     # Created from text, so there is no file and no execution-policy check.
     # Parameters are passed by name here rather than splatted: a hashtable
     # splat on a scriptblock invocation binds as ONE positional argument.
