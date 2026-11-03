@@ -367,6 +367,12 @@ line there.
 Unlinks and re-links OneDrive for the logged-on user, streaming progress as it goes and
 verifying the result before claiming success.
 
+**Prerequisite for a hands-off work-account fix:** unlinking does not sign in. OneDrive will
+only re-authenticate a work/school account by itself with `SilentAccountConfig=1`
+(`HKLM:\SOFTWARE\Policies\Microsoft\OneDrive`). Without it the account stays unlinked and
+the person must sign in, which the script reports as `PARTIAL` or `NOT VERIFIED` rather than
+pretending otherwise.
+
 **How it reports.** In SYSTEM mode it stages the payload, starts a one-shot task as the
 user, then *tails the payload's log live* — every line appears in your console as the user
 session writes it. The payload finishes with one of three markers, and the script ends with

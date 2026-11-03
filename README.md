@@ -194,41 +194,57 @@ VERDICT: PRESENT
 For a user whose OneDrive will not sync, keeps asking to sign in, or shows the wrong
 account. This un-links and re-links it. **Their files are not deleted.**
 
+> ### Read this first: work accounts need a sign-in
+>
+> Unlinking a **work/school** account does not sign it back in. After the fix, OneDrive must
+> sign in again, and it will only do that by itself if your organisation has enabled the
+> silent sign-in policy (`SilentAccountConfig=1`). Without it, the person will get a OneDrive
+> sign-in window — so this is not a hands-off fix for work accounts until that policy is on.
+>
+> **Personal** accounts usually sign back in on their own.
+
 ```
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/ece5e6f139a9b2054f93cbbf0c209d4127fdd414/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/d005b0ee99d7d06753a21d95dacedfc76d24cb59/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
-If the person uses only a work/school account you can leave `-Account All` off.
+`-Account All` means every account the person has. Use `-Account Business` or `-Account
+Personal` to touch only one kind.
 
 You get **live output as it happens** — every line the work writes appears in your console
 as it is written, from inside the user's session:
 
 ```
-[16:38:17] Target user: IBN\amai
-[16:38:19] Unlinking Business1 (amai@example.com) - folder: C:\Users\amai\OneDrive
-[16:38:19]   Registry backed up to ...\OneDrive-Business1-...reg
-[16:38:20]   Removed account registration Business1
-[16:38:21] Starting OneDrive to re-link
-[16:38:21] Waiting up to 120s for OneDrive to sign back in and re-register...
-[16:38:30]   account re-registered as: Business1
-[16:38:30] VERIFIED-COMPLETE: OneDrive signed back in and re-registered the account.
-
-RESULT: VERIFIED - OneDrive is unlinked, re-linked and signed back in.
+[09:42:39] Stopping OneDrive (PID 28940)
+[09:42:40] Unlinking Business1 (david@example.com) - folder: C:\Users\David\OneDrive - Example
+[09:42:40]   Registry backed up to ...\OneDrive-Business1-....reg
+[09:42:40]   Removed account registration Business1
+[09:42:41] Starting OneDrive to re-link
+[09:42:41] Waiting up to 120s for OneDrive to sign back in and re-register 1 account(s): Business1
+[09:42:44]   Business1: signed back in  (david@example.com)
+[09:42:44] VERIFIED-COMPLETE: all 1 account(s) signed back in and re-registered.
 ```
 
-**`RESULT: VERIFIED` is the only line that means it worked** — it appears only after
-OneDrive has re-created its own account registration. `NOT VERIFIED` means it had not
-signed back in within two minutes, which normally means a sign-in window is waiting on the
-user's desktop.
+**The `RESULT:` line is the answer — read only that:**
 
-OneDrive restarts by itself. If your organisation has not turned on "silently sign in",
-the user will see a OneDrive sign-in window — tell them it is coming, or run this while
-they are at lunch. Nothing on their screen is taken over, and the script no longer closes
-your console when it finishes.
+| Result | Means | Do this |
+|---|---|---|
+| `VERIFIED` (green) | Every real account came back | nothing |
+| `PARTIAL` (yellow) | Some did; the log names the missing ones | sign the missing account in, or enable silent sign-in |
+| `NOT VERIFIED` (yellow) | Nothing came back within 2 minutes | a sign-in window is probably waiting on their desktop |
+| `NOTHING TO DO` (yellow) | No real account was unlinked | the OneDrive may not be signed in at all — sign in first |
+
+Each account is checked **individually** in the user's own registry, so `VERIFIED` means all
+of them returned, not just one. Empty leftover registrations (no folder, no email) are
+cleaned up but never counted as failures.
+
+Nothing on the person's screen is taken over, and the script does not close your console
+when it finishes. A `.reg` backup of every removed account is kept in
+`%LOCALAPPDATA%\OneDriveRelink` on their machine, so any of this can be reverted with
+`reg import`.
 
 ---
 
@@ -244,6 +260,7 @@ your console when it finishes.
 | `More than one user is logged on` | Two people are signed in; the script will not guess. | Add `$env:PrinterSetupUser = 'DOMAIN\name'`. |
 | `Nobody is logged on` | There is no user session to fix. | Ask them to sign in first. |
 | `VERDICT: ABSENT` | The printer really is not there. | Add it. |
+| `RESULT: PARTIAL` (OneDrive) | Some accounts did not sign back in. | Sign the named account in; or enable silent sign-in. |
 
 ### Read the result without running anything again
 
