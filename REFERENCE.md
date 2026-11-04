@@ -349,7 +349,7 @@ fixing a tool updates the menu too.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 Menu: `1` add a printer, `2` check printers, `3` fix OneDrive, `4` check OneDrive (read-only),
@@ -384,7 +384,7 @@ others and prints a report ending in a verdict.
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 | iex
 ```
 
 Checks, all in the user's own session:
