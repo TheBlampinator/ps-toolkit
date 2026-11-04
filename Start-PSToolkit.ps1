@@ -45,15 +45,15 @@ $version = '1.5.0'
 # Pinned to immutable revisions. Update these three lines only when
 # republishing a tool, and the menu picks up the new build.
 $Urls = [ordered]@{
-    PrinterSetup    = 'https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
-    PrinterCheck    = 'https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
-    RemovePrinter   = 'https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1'
-    MapDrive        = 'https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1'
-    OneDrive        = 'https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
-    RestartOneDrive = 'https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1'
-    OneDriveChk     = 'https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
-    OutlookCache    = 'https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1'
-    ReinstallOneDrive = 'https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1'
+    PrinterSetup    = 'https://gist.githubusercontent.com/seanblampey/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1'
+    PrinterCheck    = 'https://gist.githubusercontent.com/seanblampey/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1'
+    RemovePrinter   = 'https://gist.githubusercontent.com/seanblampey/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1'
+    MapDrive        = 'https://gist.githubusercontent.com/seanblampey/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1'
+    OneDrive        = 'https://gist.githubusercontent.com/seanblampey/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1'
+    RestartOneDrive = 'https://gist.githubusercontent.com/seanblampey/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1'
+    OneDriveChk     = 'https://gist.githubusercontent.com/seanblampey/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1'
+    OutlookCache    = 'https://gist.githubusercontent.com/seanblampey/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1'
+    ReinstallOneDrive = 'https://gist.githubusercontent.com/seanblampey/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1'
 }
 
 # Set PSToolkitDryRun=1 to see what would run without running it.

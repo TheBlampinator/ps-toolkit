@@ -66,7 +66,7 @@ Paste it and the script asks you what you want to do.
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -74,7 +74,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54dd
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/e8c8f5e9efb6689f285c9d54ddbfd46d/raw/Start-PSToolkit.ps1 | iex
 ```
 
 ```
@@ -130,7 +130,7 @@ put your printer's address there.
 
 ```
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -139,7 +139,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e
 #!ps
 #timeout=600000
 $env:PrinterSetupPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/84923f2c6a155cfa245a353e3e00f995/raw/Printer-Setup-Paste.ps1 | iex
 ```
 
 **Step 3.** Paste the block and run it.
@@ -210,7 +210,7 @@ Same idea, and this one only *looks* — it never changes anything.
 
 ```
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -219,7 +219,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad55
 #!ps
 #timeout=600000
 $env:PrinterCheckPath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/8905bde8066b4057770126ad5550f0ad/raw/Printer-Check.ps1 | iex
 ```
 
 Put the printer you are looking for on line 3, or the word `list` to see everything
@@ -271,7 +271,7 @@ account. This un-links and re-links it. **Their files are not deleted.**
 
 ```
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/seanblampey/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -281,7 +281,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a
 #!ps
 #timeout=600000
 $f = "$env:TEMP\Reset-OneDriveLink-2.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/seanblampey/4faca813edea0891225baed59a7fb2db/raw/Reset-OneDriveLink-2.ps1 -OutFile $f
 & $f -Account All
 ```
 
@@ -331,7 +331,7 @@ changes nothing, so it is safe to run before deciding whether to re-link.
 
 ```
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/seanblampey/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
@@ -341,7 +341,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed
 #!ps
 #timeout=600000
 $f = "$env:TEMP\OneDrive-Check.ps1"
-irm https://gist.githubusercontent.com/TheBlampinator/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
+irm https://gist.githubusercontent.com/seanblampey/cba2dc56424f35868221f9aeed2cc0a7/raw/OneDrive-Check.ps1 -OutFile $f
 & $f
 ```
 
@@ -393,7 +393,7 @@ before adding it again cleanly. Same shape as adding.
 
 ```
 $env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -402,7 +402,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9
 #!ps
 #timeout=600000
 $env:PrinterRemovePath = '\\PRINTSERVER\QUEUE-NAME'
-irm https://gist.githubusercontent.com/TheBlampinator/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/f0f01ce8ee39a3f2e7ccfdb0d9ba3707/raw/Remove-Printer-Paste.ps1 | iex
 ```
 
 It reads the printer back out of the user's list afterwards, so `RESULT: REMOVED` means it
@@ -421,7 +421,7 @@ the person never sees it. This bridges into their session and maps it there, per
 ```
 $env:MapDriveLetter = 'Z'
 $env:MapDrivePath   = '\\SERVER\SHARE'
-irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -431,7 +431,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3b
 #timeout=600000
 $env:MapDriveLetter = 'Z'
 $env:MapDrivePath   = '\\SERVER\SHARE'
-irm https://gist.githubusercontent.com/TheBlampinator/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/aeb934e2c6047d18c0536dec3bf9b8e1/raw/Map-NetworkDrive.ps1 | iex
 ```
 
 To **unmap** a drive, give the letter and set remove:
@@ -456,7 +456,7 @@ it again in the person's session. It does **not** unlink or touch any account �
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -464,7 +464,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/5f0bb5443756d90d4bf1dcffbe42f966/raw/Restart-OneDrive.ps1 | iex
 ```
 
 `RESULT: RUNNING` means the process came back up; `NOT RUNNING` usually means a sign-in window
@@ -483,7 +483,7 @@ local-only data such as POP mail and archives — are never touched.
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -491,7 +491,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/68abdad5f56cb478b9f1315acf7ce94f/raw/Reset-OutlookCache.ps1 | iex
 ```
 
 | Result | Means |
@@ -521,7 +521,7 @@ starts it.
 **Backstage (live session) - paste as-is:**
 
 ```
-irm https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
 ```
 
 **Commands tab (website, no remote session) - keep the top two lines together:**
@@ -529,7 +529,7 @@ irm https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d
 ```
 #!ps
 #timeout=600000
-irm https://gist.githubusercontent.com/TheBlampinator/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
+irm https://gist.githubusercontent.com/seanblampey/7852b0347201489539fc3b2b4d0e3001/raw/Reinstall-OneDrive.ps1 | iex
 ```
 
 | Result | Means |
