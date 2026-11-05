@@ -121,7 +121,7 @@ if ($PrinterPath -notmatch '^\\\\[^\\]+\\[^\\]+$') {
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$scriptVersion = '2.5.0'
+$scriptVersion = '2.6.0'
 
 function Say { param([string]$m) Write-Host ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) }
 
@@ -177,10 +177,10 @@ try {
         Write-Log ('Driver needed:    {0}' -f $remote.DriverName)
         Write-Log ('Driver installed: {0}' -f $haveIt)
         if (-not $haveIt) {
-            Write-Log 'This machine does not have that driver yet, so Windows will ask to install it.'
-            Write-Log 'If nobody clicks Install, this fails with 0x800704C7 (cancelled by the user).'
-            Write-Log 'Fix once per machine: run with Elevated on and someone at the PC to click Install,'
-            Write-Log 'or pre-install the driver / trust the print server via the PointAndPrint policy.'
+            Write-Log 'The SYSTEM step could not install that driver from the print server.'
+            Write-Log 'Windows will install it during the connection; the SYSTEM step switched off'
+            Write-Log 'the Point and Print prompts for this server, so it should still be silent.'
+            Write-Log 'If this fails with 0x800704C7, the prompt appeared anyway - read the console output.'
         }
     }
     catch {
@@ -441,63 +441,213 @@ if ($DriverSource -and (Test-Path -LiteralPath $DriverSource)) {
     }
 }
 
-# Pull the driver straight out of the print server's print$ share and install it
-# with pnputil. This is what Point-and-Print would do, minus the consent dialog:
-# no prompt, no policy change, no vendor download.
+# Install the queue's driver machine-wide straight from the print server, with no
+# dialog. Package-aware drivers (nearly every modern one) are published in
+# \\SERVER\print$\<arch>\PCC as one .cab per driver package, named after the
+# package's DriverStore folder - which the server reports as the driver's InfPath.
+# pnputil stages that package; Add-PrinterDriver then registers the printer driver.
+# Both steps are needed: pnputil alone only fills the DriverStore, and the spooler
+# does not list the driver (so Windows still prompts) until Add-PrinterDriver runs.
 function Install-DriverFromPrintShare {
     param([string]$Server, [string]$DriverName)
 
-    $share = "\\$Server\print`$\x64"
-    if (-not (Test-Path -LiteralPath $share)) {
-        Write-Host ('  print$ share not readable on {0} ({1})' -f $Server, $share) -ForegroundColor DarkGray
-        return $false
-    }
+    $isArm = $env:PROCESSOR_ARCHITECTURE -eq 'ARM64'
+    $arch  = if ($isArm) { 'ARM64' } else { 'x64' }
+    $penv  = if ($isArm) { 'Windows ARM64' } else { 'Windows x64' }
+    $pcc   = "\\$Server\print`$\$arch\PCC"
 
-    $stage = 'C:\ProgramData\PrinterToolkit\drivers\from-server'
-    try { $null = New-Item -ItemType Directory -Path $stage -Force } catch { return $false }
-
-    Write-Host ('  Copying the driver from {0} ...' -f $share) -ForegroundColor DarkGray
+    $srvInf = $null
     try {
-        Copy-Item -Path (Join-Path $share '*') -Destination $stage -Recurse -Force -ErrorAction SilentlyContinue
+        $srvInf = @(Get-PrinterDriver -ComputerName $Server -Name $DriverName -PrinterEnvironment $penv -ErrorAction Stop)[0].InfPath
     }
     catch {
-        Write-Host ('  Copy failed: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+        Write-Host ('  Could not read the driver details from {0}: {1}' -f $Server, $_.Exception.Message) -ForegroundColor DarkGray
     }
-
-    $infs = @(Get-ChildItem -LiteralPath $stage -Filter '*.inf' -Recurse -ErrorAction SilentlyContinue)
-    if (-not $infs.Count) {
-        Write-Host '  No .inf found in the print$ copy.' -ForegroundColor Yellow
+    if (-not $srvInf) {
+        Write-Host ('  The server reports no driver package for {0} ({1}).' -f $DriverName, $penv) -ForegroundColor Yellow
+        return $false
+    }
+    if (-not (Test-Path -LiteralPath $pcc)) {
+        Write-Host ('  Driver package share not readable: {0}' -f $pcc) -ForegroundColor Yellow
         return $false
     }
 
-    foreach ($inf in $infs) {
-        Write-Host ('  pnputil /add-driver {0}' -f $inf.Name) -ForegroundColor DarkGray
-        try { & pnputil.exe /add-driver $inf.FullName /install | Out-Null } catch { }
-        $now = @(Get-PrinterDriver -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $DriverName }).Count -gt 0
-        if ($now) { return $true }
+    $pkgFolder = Split-Path -Leaf (Split-Path -Parent $srvInf)    # e.g. brprl19a.inf_amd64_0123abcd
+    $infLeaf   = Split-Path -Leaf $srvInf                         # e.g. brprl19a.inf
+    $cab = $null
+    $exact = Join-Path $pcc ($pkgFolder + '.cab')
+    if (Test-Path -LiteralPath $exact) { $cab = Get-Item -LiteralPath $exact }
+    else {
+        $cab = Get-ChildItem -LiteralPath $pcc -Filter ($infLeaf + '_*.cab') -ErrorAction SilentlyContinue |
+                   Sort-Object LastWriteTime | Select-Object -Last 1
     }
-    return $false
+    if (-not $cab) {
+        Write-Host ('  No package for {0} in {1} - the server driver is not package-aware.' -f $infLeaf, $pcc) -ForegroundColor Yellow
+        return $false
+    }
+
+    # Unpack into a folder only SYSTEM and Administrators can write to, so nothing
+    # can be slipped in between unpacking and installing.
+    $stage = Join-Path $env:windir ('Temp\PrinterToolkit-{0}' -f [guid]::NewGuid().ToString('N'))
+    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') {
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+            (New-Object System.Security.Principal.SecurityIdentifier $sid), 'FullControl',
+            'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+    }
+
+    try {
+        $null = [IO.Directory]::CreateDirectory($stage, $acl)
+        Write-Host ('  Unpacking {0} from the print server ...' -f $cab.Name) -ForegroundColor DarkGray
+        $null = & expand.exe -F:* $cab.FullName $stage 2>&1
+
+        $infs = @(Get-ChildItem -LiteralPath $stage -Filter '*.inf' -Recurse -ErrorAction SilentlyContinue)
+        $inf = @(@($infs | Where-Object { $_.Name -eq $infLeaf }) + $infs) | Select-Object -First 1
+        if (-not $inf) {
+            Write-Host ('  No .inf inside {0}.' -f $cab.Name) -ForegroundColor Yellow
+            return $false
+        }
+
+        $null = & pnputil.exe /add-driver $inf.FullName 2>&1
+        Write-Host ('  pnputil /add-driver {0} exit code: {1}' -f $inf.Name, $LASTEXITCODE) -ForegroundColor DarkGray
+
+        try { Add-PrinterDriver -Name $DriverName -ErrorAction Stop }
+        catch {
+            try { Add-PrinterDriver -Name $DriverName -InfPath $inf.FullName -ErrorAction Stop }
+            catch { Write-Host ('  Add-PrinterDriver failed: {0}' -f $_.Exception.Message) -ForegroundColor Yellow }
+        }
+        return (@(Get-PrinterDriver -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $DriverName }).Count -gt 0)
+    }
+    catch {
+        Write-Host ('  Installing from the print server failed: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+        return $false
+    }
+    finally {
+        Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # =====================================================================
-#  AUTOMATIC DRIVER DELIVERY.
+#  LAST RESORT: let Point and Print install the driver - SILENTLY.
 #
-#  Windows will not let a background process answer the "install this
-#  printer driver?" prompt, so a connection to a queue whose driver the
-#  machine lacks fails with 0x800704C7. There is no way to click it and no
-#  way around it - except to let the print server deliver the driver
-#  without asking, for the length of this one operation.
+#  Reached only when the driver could not be installed above (the server's
+#  driver is not package-aware, or its print$ share is not readable).
+#  Windows then installs it during the connection, as the user, and three
+#  values decide whether that shows a dialog:
+#    RestrictDriverInstallationToAdministrators = 0   non-admins may install
+#    NoWarningNoElevationOnInstall              = 1   no "Install driver?" prompt
+#    UpdatePromptSettings                       = 2   no prompt for an update
+#  Setting only the first (as v2.5 and earlier did) still shows the prompt,
+#  and an unattended run fails with 0x800704C7 because nobody clicks it.
+#  TrustedServers + ServerList limit this to the one print server.
 #
-#  RestrictDriverInstallationToAdministrators is the switch that governs
-#  that. It is set to 0 here, the connection runs, and the previous value
-#  is put back in the finally block below. Nothing is left changed.
+#  Every value is put back exactly as it was: by the finally block when the
+#  result arrives in time, otherwise by a one-shot SYSTEM task that waits
+#  for the user-session log (max 20 min). So the policy is restored even if
+#  this console is killed before the connection finishes.
 #
 #  Skipped entirely when the driver is already installed.
 # =====================================================================
-$script:PolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
-$script:PolicyName = 'RestrictDriverInstallationToAdministrators'
-$script:PolicyOld  = 'UNTOUCHED'
-$script:PolicySet  = $false
+$script:PolicyPath     = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers\PointAndPrint'
+$script:PolicySaved    = $null     # name -> @{ Value; Kind }, or $null where the value did not exist
+$script:PolicyKeyNew   = $false
+$script:PolicyRestore  = $null     # PowerShell text that puts every value back
+$script:PolicyWatchdog = $null
+
+function ConvertTo-PsLiteral {
+    param($Value)
+    if ($Value -is [array]) { return '@(' + ((@($Value) | ForEach-Object { ConvertTo-PsLiteral $_ }) -join ',') + ')' }
+    if ($Value -is [int] -or $Value -is [long] -or $Value -is [uint32]) { return [string]$Value }
+    return "'" + ([string]$Value).Replace("'", "''") + "'"
+}
+
+function Open-SilentPointAndPrint {
+    param([string]$Server)
+
+    # Only create the key when it is missing: New-Item -Force on an EXISTING registry
+    # key deletes and recreates it, wiping every value a GPO put there.
+    $script:PolicyKeyNew = -not (Test-Path -LiteralPath $script:PolicyPath)
+    if ($script:PolicyKeyNew) { $null = New-Item -Path $script:PolicyPath -Force }
+    $key = Get-Item -LiteralPath $script:PolicyPath
+
+    # Keep any servers a GPO already trusts; just add this one.
+    $servers = @()
+    if ($key.GetValue('TrustedServers', 0) -eq 1) {
+        $servers = @(([string]$key.GetValue('ServerList', '')).Split(';') | Where-Object { $_ })
+    }
+    if ($servers -notcontains $Server) { $servers += $Server }
+
+    $want = [ordered]@{
+        RestrictDriverInstallationToAdministrators = @(0, 'DWord')
+        NoWarningNoElevationOnInstall              = @(1, 'DWord')
+        UpdatePromptSettings                       = @(2, 'DWord')
+        TrustedServers                             = @(1, 'DWord')
+        ServerList                                 = @(($servers -join ';'), 'String')
+    }
+
+    $saved = [ordered]@{}
+    foreach ($name in $want.Keys) {
+        if ($key.GetValueNames() -contains $name) {
+            $saved[$name] = @{ Value = $key.GetValue($name, $null, 'DoNotExpandEnvironmentNames')
+                               Kind  = [string]$key.GetValueKind($name) }
+        }
+        else { $saved[$name] = $null }
+    }
+    $script:PolicySaved = $saved
+
+    $lines = @("`$p = '{0}'" -f $script:PolicyPath)
+    foreach ($name in $saved.Keys) {
+        $s = $saved[$name]
+        if ($null -eq $s) {
+            $lines += "Remove-ItemProperty -LiteralPath `$p -Name '$name' -ErrorAction SilentlyContinue"
+        }
+        else {
+            $lines += "Set-ItemProperty -LiteralPath `$p -Name '$name' -Value $(ConvertTo-PsLiteral $s.Value) -Type $($s.Kind) -Force"
+        }
+    }
+    if ($script:PolicyKeyNew) {
+        $lines += "if (-not @((Get-Item -LiteralPath `$p).GetValueNames()).Count) { Remove-Item -LiteralPath `$p -Force }"
+    }
+    $script:PolicyRestore = $lines -join "`r`n"
+
+    # Arm the watchdog BEFORE opening the gate, so there is never a moment where
+    # the policy is open with nothing scheduled to close it.
+    $since = (Get-Date).AddSeconds(-3).Ticks
+    $taskName = 'PrinterSetup-RestorePolicy-' + $stamp
+    $watch = @"
+`$since = New-Object DateTime $since
+`$deadline = (Get-Date).AddMinutes(20)
+while ((Get-Date) -lt `$deadline) {
+    `$done = Get-ChildItem 'C:\Users\*\AppData\Local\PrinterToolkit\Setup-*.log' -ErrorAction SilentlyContinue |
+                Where-Object { `$_.LastWriteTime -ge `$since } |
+                Where-Object { (Get-Content -LiteralPath `$_.FullName -Raw -ErrorAction SilentlyContinue) -match 'CONNECTED OK|FAILED:' }
+    if (`$done) { break }
+    Start-Sleep -Seconds 5
+}
+$($script:PolicyRestore)
+Unregister-ScheduledTask -TaskName '$taskName' -Confirm:`$false -ErrorAction SilentlyContinue
+"@
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($watch))
+    try {
+        $wAction    = New-ScheduledTaskAction -Execute 'powershell.exe' `
+                          -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {0}' -f $enc)
+        $wPrincipal = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount -RunLevel Highest
+        $wSettings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+                          -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+        Register-ScheduledTask -TaskName $taskName -Action $wAction -Principal $wPrincipal `
+            -Settings $wSettings -Force | Out-Null
+        Start-ScheduledTask -TaskName $taskName
+        $script:PolicyWatchdog = $taskName
+    }
+    catch {
+        Write-Host ('  Could not schedule the policy restore task: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+    }
+
+    foreach ($name in $want.Keys) {
+        Set-ItemProperty -LiteralPath $script:PolicyPath -Name $name -Value $want[$name][0] -Type $want[$name][1] -Force
+    }
+}
 
 $queueDriver = $null
 try {
@@ -524,35 +674,26 @@ if ($queueDriver) {
         }
         catch { $isAdminish = $false }
 
-        # Attempt 1: install it ourselves from the print server's print$ share.
-        $gotIt = $false
-        if ($isAdminish) {
-            $qp2 = $PrinterPath.TrimStart('\\').Split('\\')
-            $gotIt = Install-DriverFromPrintShare -Server $qp2[0] -DriverName $queueDriver
+        if (-not $isAdminish) {
+            Write-Host '  Driver missing and this shell is not elevated - it can only be installed by the user, which is not possible unattended.' -ForegroundColor Yellow
+        }
+        else {
+            # Attempt 1: install it ourselves from the print server's print$ share.
+            Write-Host ('  Driver missing ({0}) - installing it from the print server.' -f $queueDriver) -ForegroundColor DarkGray
+            $gotIt = Install-DriverFromPrintShare -Server $qp[0] -DriverName $queueDriver
             if ($gotIt) {
                 Write-Host ('  Driver installed from the print server: {0}' -f $queueDriver) -ForegroundColor Green
             }
-        }
-
-        # Attempt 2 (only if that failed): let Windows do it, with the consent gate
-        # opened for the length of this run.
-        if (-not $gotIt -and -not $isAdminish) {
-            Write-Host '  Driver missing and this shell is not elevated - it can only be installed by the user, which is not possible unattended.' -ForegroundColor Yellow
-        }
-        elseif (-not $gotIt) {
-            try {
-                if (Test-Path -LiteralPath $script:PolicyPath) {
-                    $cur = Get-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -ErrorAction SilentlyContinue
-                    if ($cur -and $null -ne $cur.$($script:PolicyName)) { $script:PolicyOld = $cur.$($script:PolicyName) }
+            else {
+                # Attempt 2: let Point and Print install it, with every prompt switched off.
+                try {
+                    Open-SilentPointAndPrint -Server $qp[0]
+                    Write-Host '  Point and Print opened silently for this server for this run.' -ForegroundColor DarkGray
+                    Write-Host '  (the previous policy values are restored when this finishes)' -ForegroundColor DarkGray
                 }
-                $null = New-Item -Path $script:PolicyPath -Force
-                Set-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -Value 0 -Type DWord -Force
-                $script:PolicySet = $true
-                Write-Host ('  Driver missing ({0}) - allowing the print server to install it for this run.' -f $queueDriver) -ForegroundColor DarkGray
-                Write-Host '  (the previous policy value is restored when this finishes)' -ForegroundColor DarkGray
-            }
-            catch {
-                Write-Host ('  Could not set the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+                catch {
+                    Write-Host ('  Could not set the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Yellow
+                }
             }
         }
     }
@@ -666,20 +807,27 @@ try {
     }
 }
 finally {
-    # Put the PointAndPrint policy back exactly as it was, whatever happened.
-    if ($script:PolicySet) {
-        try {
-            if ($script:PolicyOld -eq 'UNTOUCHED') {
-                Remove-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-ItemProperty -LiteralPath $script:PolicyPath -Name $script:PolicyName -Value $script:PolicyOld -Type DWord -Force
-            }
-            Write-Host '  PointAndPrint policy restored.' -ForegroundColor DarkGray
+    # Put the PointAndPrint policy back exactly as it was. When the connection is still
+    # running (deferred), the watchdog task does it once the user-session log has a
+    # result - closing the gate now would bring the prompt straight back.
+    if ($script:PolicySaved) {
+        if ($deferred -and $script:PolicyWatchdog) {
+            Write-Host ('  PointAndPrint policy is restored by task {0} when the connection finishes (max 20 min).' -f $script:PolicyWatchdog) -ForegroundColor DarkGray
         }
-        catch {
-            Write-Host ('  WARNING: could not restore the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Red
-            Write-Host ('  Reset it by hand: {0} -> {1}' -f $script:PolicyPath, $script:PolicyName) -ForegroundColor Red
+        else {
+            try {
+                & ([scriptblock]::Create($script:PolicyRestore))
+                Write-Host '  PointAndPrint policy restored.' -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host ('  WARNING: could not restore the PointAndPrint policy: {0}' -f $_.Exception.Message) -ForegroundColor Red
+                Write-Host '  Reset it by hand with:' -ForegroundColor Red
+                Write-Host $script:PolicyRestore -ForegroundColor Red
+            }
+            if ($script:PolicyWatchdog) {
+                Stop-ScheduledTask -TaskName $script:PolicyWatchdog -ErrorAction SilentlyContinue
+                Unregister-ScheduledTask -TaskName $script:PolicyWatchdog -Confirm:$false -ErrorAction SilentlyContinue
+            }
         }
     }
     # Never remove the payload while a deferred task may still be about to use it.

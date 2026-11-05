@@ -550,7 +550,7 @@ If several people are logged on, set `$env:OneDriveReinstallUser = 'DOMAIN\name'
 | `STOPPED - ... NOTHING WAS CHANGED` | A setting was missing or the address was malformed. | Read the message, it shows the exact line to type. |
 | `Missing type name after '['` | You pasted *output* instead of the script. | The real script starts with `#!ps`. Clear the box and paste again. |
 | `Access is denied` | The driver could not be installed automatically. | Add `$env:PrinterSetupElevated = 'true'`. |
-| `0x800704C7` / "canceled by the user" | Windows asked for permission to install the driver and nobody was there to click. | Should no longer happen — the tool installs the driver itself. If it does, the print server's `print$` share is not readable. |
+| `0x800704C7` / "canceled by the user" | Windows asked for permission to install the driver and nobody was there to click. | Should no longer happen — the tool installs the driver from the print server, and failing that turns off the Point and Print prompts for that server during the run. If it still appears, a Windows Protected Print or vendor policy is overriding those settings. |
 | `More than one user is logged on` | Two people are signed in; the script will not guess. | Add `$env:PrinterSetupUser = 'DOMAIN\name'`. |
 | `Nobody is logged on` | There is no user session to fix. | Ask them to sign in first. |
 | `VERDICT: ABSENT` | The printer really is not there. | Add it. |
