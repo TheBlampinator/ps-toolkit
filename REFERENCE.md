@@ -256,15 +256,23 @@ printer driver the machine does not have, and a background run cannot answer tha
 the connection fails with `0x800704C7` (ERROR_CANCELLED). So before connecting, the tool
 installs the driver itself, machine-wide, as SYSTEM:
 
-1. **Copies it from the print server's own share** — `\\SERVER\print$\x64` — and installs
-   it with `pnputil /add-driver ... /install`. This is the same driver package
-   Point-and-Print would fetch; doing it directly means no dialog. Nothing to stage by hand.
+1. **Installs it from the print server's own share.** The server reports the driver's
+   package (its `InfPath`), and the matching `.cab` is taken from `\\SERVER\print$\x64\PCC`.
+   It is unpacked into a folder only SYSTEM and Administrators can write to, staged with
+   `pnputil /add-driver`, then registered with `Add-PrinterDriver`. Both steps are needed:
+   `pnputil` alone only fills the DriverStore, and Windows keeps prompting until the spooler
+   lists the driver. This is the same package Point-and-Print would fetch. Nothing to stage by hand.
 2. **Staged `.inf`, if present** — anything in `C:\ProgramData\PrinterToolkit\drivers`,
-   or `$env:PrinterSetupDriverSource`, is installed the same way. The vendor package is only
-   needed if the server's `print$` is not readable.
-3. **Last resort** — `RestrictDriverInstallationToAdministrators` is set to `0` for the
-   length of the run so Windows may install it itself. The previous value is restored in a
-   `finally` block; if restoring ever fails, the log says so in red with the key path.
+   or `$env:PrinterSetupDriverSource`, is installed with `printui /ia`. Only needed when the
+   server's driver is not package-aware or `print$` is not readable.
+3. **Last resort, still silent** — Point and Print is opened for this one server:
+   `RestrictDriverInstallationToAdministrators=0`, `NoWarningNoElevationOnInstall=1`,
+   `UpdatePromptSettings=2`, `TrustedServers=1` and the server added to `ServerList`.
+   Setting only the first (v2.5 and earlier) still showed the "Install driver?" dialog.
+   Every value is put back exactly as it was: in the `finally` block, or, when the console
+   returns before the connection finishes, by a one-shot SYSTEM task
+   `PrinterSetup-RestorePolicy-<stamp>` that waits for the user-session log (max 20 min).
+   Existing GPO values under the key are left alone.
 
 Verified with `Get-PrinterDriver` before the connection is attempted, so a missing driver is
 reported as a missing driver rather than as a failed connection.
