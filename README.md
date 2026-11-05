@@ -309,7 +309,8 @@ as it is written, from inside the user's session:
 | `VERIFIED` (green) | Every real account came back | nothing |
 | `PARTIAL` (yellow) | Some did; the log names the missing ones | sign the missing account in, or enable silent sign-in |
 | `NOT VERIFIED` (yellow) | Nothing came back within 2 minutes | a sign-in window is probably waiting on their desktop |
-| `NOTHING TO DO` (yellow) | No real account was unlinked | the OneDrive may not be signed in at all — sign in first |
+| `CLEANED UP` (yellow) | Only empty leftover registrations were removed; no signed-in account was found | the user needs to sign in to OneDrive |
+| `NOTHING TO DO` (yellow) | No registered account matched the choice (work / personal); nothing was changed | pick the other account type, or sign in first |
 
 Each account is checked **individually** in the user's own registry, so `VERIFIED` means all
 of them returned, not just one. Empty leftover registrations (no folder, no email) are
@@ -516,7 +517,10 @@ starts it.
   installer is available, nothing is uninstalled.
 - Synced files and OneDrive folders are not touched. Unless the organisation has silent sign-in,
   the user may see a OneDrive sign-in window afterwards.
-- Per-user installs only; a per-machine install (Program Files) is reported and left alone.
+- Handles both install types. A per-user install (`%LOCALAPPDATA%\Microsoft\OneDrive`) is
+  reinstalled as the user. A per-machine install (`C:\Program Files\Microsoft OneDrive`, the
+  default on current Windows 11) is reinstalled with admin rights (`/allusers`) and then started
+  in the user's session, so it needs the Commands tab (SYSTEM) or an elevated shell.
 
 **Backstage (live session) - paste as-is:**
 
@@ -535,6 +539,7 @@ irm https://gist.githubusercontent.com/seanblampey/7852b0347201489539fc3b2b4d0e3
 | Result | Means |
 |---|---|
 | `REINSTALLED` | OneDrive was uninstalled, installed again, and is running |
+| `REINSTALLED BUT NOT RUNNING` | per-machine reinstall done, but OneDrive did not start in the user's session; it starts at their next sign-in |
 | `NOTHING TO DO` | OneDrive is not installed for this user |
 | `FAILED` | see the FAILED line; if it failed before "Uninstalling", nothing was changed |
 

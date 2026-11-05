@@ -39,7 +39,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$version = '1.5.0'
+$version = '1.5.1'
 
 # ---- published tools this menu drives --------------------------------------
 # Pinned to immutable revisions. Update these three lines only when
@@ -253,6 +253,9 @@ function Show-LatestLog {
     $raw = Get-Content -LiteralPath $f.FullName -Raw
     if ($SuccessPattern -and $raw -match $SuccessPattern) {
         Line ('  VERDICT: {0} - it worked.' -f $Label) -ForegroundColor Green
+    }
+    elseif ($raw -match 'CLEANED-UP') {
+        Line '  VERDICT: CLEANED UP - only empty leftover registrations were removed; no signed-in account was found.' -ForegroundColor Yellow
     }
     elseif ($raw -match 'NOTHING-TO-DO') {
         Line '  VERDICT: NOTHING TO DO - no account matched; nothing was changed.' -ForegroundColor Yellow

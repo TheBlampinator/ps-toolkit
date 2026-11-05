@@ -434,7 +434,8 @@ a matching `RESULT:` line:
 |---|---|---|
 | `VERIFIED-COMPLETE` | OneDrive signed back in and re-created its account key | `RESULT: VERIFIED` (green) |
 | `PARTIAL-RESTORED` | some accounts came back, some did not (named in the log) | `RESULT: PARTIAL` |
-| `NOTHING-TO-DO` | nothing real was unlinked | `RESULT: NOTHING TO DO` |
+| `CLEANED-UP` | only empty leftover registrations were removed; no signed-in account was found | `RESULT: CLEANED UP` |
+| `NOTHING-TO-DO` | no registered account matched the requested type; nothing was changed | `RESULT: NOTHING TO DO` |
 | `VERIFICATION FAILED` | not signed back in within 120 s | `RESULT: NOT VERIFIED` |
 | `VERIFICATION SKIPPED` | `-NoRestart` was used | `RESULT: UNLINKED` |
 

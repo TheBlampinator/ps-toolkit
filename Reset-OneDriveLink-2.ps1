@@ -169,18 +169,23 @@ function Invoke-OneDriveWork {
             Write-Log 'NOTHING-TO-DO: this user has no OneDrive account registered.'
         }
         else {
-            $targets = Get-ChildItem $accountsKey | Where-Object {
+            # The name is captured BEFORE the switch: inside a switch block $_ is the value
+            # being switched on ($Account), so '$_.PSChildName' was always empty and no
+            # account ever matched - 'Business' unlinked nothing, 'All' only worked via
+            # the fallback below.
+            $targets = @(Get-ChildItem -LiteralPath $accountsKey | Where-Object {
+                $n = $_.PSChildName
                 switch ($Account) {
-                    'Business' { $_.PSChildName -like 'Business*' }
-                    'Personal' { $_.PSChildName -eq 'Personal' }
-                    default    { $_.PSChildName -like 'Business*' -or $_.PSChildName -eq 'Personal' }
+                    'Business' { $n -like 'Business*' }
+                    'Personal' { $n -eq 'Personal' }
+                    default    { $n -like 'Business*' -or $n -eq 'Personal' }
                 }
-            }
+            })
 
             # 'All' should mean all. If the names do not match Business*/Personal - which
             # happens with some Azure AD builds - fall back to every registered account
             # rather than doing nothing and claiming success.
-            if (-not $targets -and $Account -eq 'All') {
+            if (-not $targets.Count -and $Account -eq 'All') {
                 $allKeys = @(Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue)
                 if ($allKeys.Count) {
                     Write-Log ('No Business*/Personal key matched - treating every registered account as a target: {0}' -f `
@@ -189,7 +194,7 @@ function Invoke-OneDriveWork {
                 }
             }
 
-            if (-not $targets) {
+            if (-not $targets.Count) {
                 # Say exactly what IS registered - "no account found" alone is useless.
                 $present = @(Get-ChildItem -LiteralPath $accountsKey -ErrorAction SilentlyContinue |
                                 Select-Object -ExpandProperty PSChildName)
@@ -200,7 +205,15 @@ function Invoke-OneDriveWork {
             foreach ($key in $targets) {
                 $name  = $key.PSChildName
                 $props = Get-ItemProperty $key.PSPath
-                Write-Log "Unlinking $name ($($props.UserEmail)) - folder: $($props.UserFolder)"
+                # A signed-in account has an email, a cid, or a folder. One with none of
+                # those is an empty leftover that OneDrive will never re-create. Judging
+                # by the folder alone called a signed-in account with no folder yet a
+                # leftover, and the run then claimed nothing had changed.
+                $isReal = [bool]($props.UserEmail -or $props.cid -or $props.UserCid -or $props.UserFolder)
+                Write-Log ('Unlinking {0} ({1}) - folder: {2}{3}' -f $name,
+                            $(if ($props.UserEmail) { $props.UserEmail } else { 'no email' }),
+                            $(if ($props.UserFolder) { $props.UserFolder } else { 'none' }),
+                            $(if ($isReal) { '' } else { ' - empty leftover' }))
 
                 $backup = Join-Path $logDir "OneDrive-$name-$stamp.reg"
                 & reg.exe export ($key.Name) $backup /y | Out-Null
@@ -217,7 +230,7 @@ function Invoke-OneDriveWork {
                 Remove-Item $key.PSPath -Recurse -Force
                 Write-Log "  Removed account registration $name"
                 $removed += $name
-                $removedFolder[$name] = [string]$props.UserFolder
+                $removedFolder[$name] = $isReal
 
                 $settings = Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\settings\$name"
                 if (Test-Path -LiteralPath $settings) {
@@ -265,7 +278,8 @@ function Invoke-OneDriveWork {
                     $ghosts.Count, ($ghosts -join ', '))
     }
     if (-not $required.Count) {
-        Write-Log 'NOTHING-TO-DO: only empty registrations were found; no real account was unlinked.'
+        Write-Log ('CLEANED-UP: removed {0} empty leftover registration(s); no signed-in account was found to re-link.' -f $ghosts.Count)
+        Write-Log '  OneDrive has been restarted. If the user had a working account it will ask them to sign in.'
         return
     }
 
@@ -471,7 +485,7 @@ function Invoke-AsLoggedOnUser {
                 }
             }
 
-            if ($allText -match '(?m).*(VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO)') { break }
+            if ($allText -match '(?m).*(VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO|CLEANED-UP)') { break }
 
             $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
             if ($task) { $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue }
@@ -486,7 +500,7 @@ function Invoke-AsLoggedOnUser {
                         $allText = $lines -join "`n"
                     }
                 }
-                if ($allText -match 'VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO') { break }
+                if ($allText -match 'VERIFIED-COMPLETE|VERIFICATION FAILED|VERIFICATION SKIPPED|NOTHING-TO-DO|CLEANED-UP') { break }
                 Write-Log 'Payload exited without reporting a verdict.'
                 break
             }
@@ -507,6 +521,10 @@ function Invoke-AsLoggedOnUser {
         elseif ($allText -match 'PARTIAL-RESTORED') {
             $script:Partial = $true
             Write-Log 'Only some accounts signed back in.'
+        }
+        elseif ($allText -match 'CLEANED-UP') {
+            $script:Cleaned = $true
+            Write-Log 'Payload removed empty leftover registrations only.'
         }
         elseif ($allText -match 'NOTHING-TO-DO') {
             $script:Nothing = $true
@@ -540,6 +558,7 @@ function Invoke-AsLoggedOnUser {
 # =============================================================================
 $script:Verified = $false
 $script:Nothing  = $false
+$script:Cleaned  = $false
 $script:Partial  = $false
 $script:ExitCode = 0
 
@@ -579,6 +598,10 @@ elseif ($Script:Partial) {
     Write-Host 'RESULT: PARTIAL - some accounts did not sign back in.' -ForegroundColor Yellow
     Write-Host '        The log lists each account and whether it returned. Missing ones need a'
     Write-Host '        sign-in, or SilentAccountConfig enabled.'
+}
+elseif ($Script:Cleaned) {
+    Write-Host 'RESULT: CLEANED UP - only empty leftover registrations were removed; no signed-in account was found.' -ForegroundColor Yellow
+    Write-Host '        OneDrive was restarted. If the user needs OneDrive, they must sign in to it.'
 }
 elseif ($Script:Nothing) {
     Write-Host 'RESULT: NOTHING TO DO - no OneDrive account matched, so nothing was unlinked.' -ForegroundColor Yellow
